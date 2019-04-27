@@ -1,12 +1,16 @@
-function A = toMat(self, varargin)
+function A = toKern(self, varargin)
 % Return a matrix representing the effective kernels of this object
-%   mat = toMat(self, ...)
+%   mat = toKern(self, ...)
 %
 % Returns:
 %   mat         [L x C x K x C] matrix representing these kernels (including the
 %               cross-channel transform) as a linear map: [K x C] --> [L x C]
 % Optional parameters (key/value pairs) [default]:
 %   flatten     Flatten output into a [L*C x K*C] matrix        [ false ]
+%
+% This differs from Whitener.toMat in that this method returns the kernels for a
+% single time step, whereas Whitener.toMat produces a Toeplitz matrix that 
+% represents the whitening operator for a particular input duration.
 
 % Optional parameters
 ip = inputParser();

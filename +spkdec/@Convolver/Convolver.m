@@ -12,7 +12,7 @@
 %
 % Convolver methods:
 %   Convolver   - Construct a new Convolver object
-%   toMat       - Return a matrix representing the effective kernels
+%   toKern      - Return a matrix representing the effective kernels
 % Convolution
 %   conv        - Perform the forward convolution
 %   convT       - Perform the transpose convolution
@@ -109,7 +109,7 @@ methods
     x = convT(self, y, varargin);
     
     % Representation in a different form
-    mat = toMat(self, varargin);
+    mat = toKern(self, varargin);
 end
 
 methods (Static)

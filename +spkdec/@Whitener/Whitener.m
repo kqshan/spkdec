@@ -10,10 +10,12 @@
 %   delay       - Whitening filter delay (#samples)
 %
 % Whitener methods:
-%   Whitener    - Construct a new Whitener object
 %   whiten      - Apply this whitener to the given data
 %   toConv      - Return a Convolver object implementing this whitener
 %   toMat       - Return a matrix implemetning this whitener
+% Construction
+%   Whitener    - Construct a new Whitener object
+%   no_whiten   - [Static] Make a Whitener with no whitening
 % Whitener generation helpers
 %   makeWhFilt  - [Static] Make a set of frequency-whitening filters
 %   makeWhCh    - [Static] Make a cross-channel whitening transform
@@ -145,6 +147,15 @@ methods
 end
 
 methods (Static)
+    function obj = no_whiten(C)
+        % Make a Whitener with no whitening
+        %   obj = no_whiten(C)
+        %
+        % Required arguments:
+        %   C       Number of channels
+        obj = spkdec.Whitener('wh_filt',ones(1,C));
+    end
+    
     % Helpers for making whitening operators
     [wh_filt, wh_spec] = makeWhFilt(spect, varargin);
     wh_ch = makeWhCh(ch_cov, varargin);
@@ -175,9 +186,13 @@ end
 % ------------------------------------------------------------------------------
 
 
-% Convolver object to use for whitening
+% Caches of often-requested items
 properties (Access=protected)
+    % Convolver object to use for whitening
     convolver
+    
+    % [L+W-1 x C x L*C] whitening operation as a matrix (for a given support L)
+    whitener_mat
 end
 
 
