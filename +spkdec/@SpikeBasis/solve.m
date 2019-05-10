@@ -29,7 +29,7 @@ spk_r = spk_r(:);
 ip = inputParser();
 ip.addParameter('thresh', 1e-3, @isscalar);
 ip.parse( varargin{:} );
-prm = ip.Resuls;
+prm = ip.Results;
 
 % We are looking for x that minimizes
 %   ||y - A*x||
@@ -55,5 +55,8 @@ AtA_bands = self.gramians.getGramSeq(spk_t, spk_r, 'thresh',prm.thresh);
 
 % Solve x = (A'*A) \ (A'*y)
 spk_X = spkdec.Math.pbsolve(AtA_bands, Aty(:));
+
+% Reshape into the desired shape
+spk_X = reshape(spk_X, [K*C, N]);
 
 end

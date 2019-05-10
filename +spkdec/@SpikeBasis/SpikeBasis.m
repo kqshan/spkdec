@@ -25,11 +25,12 @@
 %   toWhBasis   - Return a WhitenerBasis for this whitener and interp
 % Convolution
 %   conv        - Perform the forward convolution
-%   conv_sp     - Perform the forward convolution with a sparse input
+%   conv_spk    - Perform the forward convolution with a Spikes object
 %   convT       - Perform the transpose convolution
 % High-level operations
 %   getDelta    - Return the improvement in squared error from adding a spike
 %   solve       - Solve for the spike features given the spike times
+%   unwhiten    - Find the raw waveform that best approximate the given spikes
 % Object management
 %   copy        - Create a deep copy of this handle object
 %   saveobj     - Serialize a SpikeBasis object to struct
@@ -159,8 +160,6 @@ methods
         obj.t0 = prm.t0;
         obj.whitener = whitener;
         obj.interp = interp;
-        % Populate protected caches
-        obj.populate_caches();
     end
     
     
@@ -174,14 +173,14 @@ methods
     % Convolution
     
     y = conv(self, x);
-    y = conv_sp(self, spk, T);
+    y = conv_spk(self, spk, T);
     x = convT(self, y);
     
     % High-level operations
     
     delta = getDelta(self, convT_y);
     spk_X = solve(self, convT_y, spk_t, spk_r, varargin);
-    
+    spikes_raw = unwhiten(self, spikes_wh);
 end
 
 methods (Static)
@@ -194,9 +193,9 @@ end
 methods (Access=protected)
     function obj = copyElement(self)
         obj = copyElement@matlab.mixin.Copyable(self);
-        obj.whitener = copy(self.whitener);
-        obj.interp = copy(self.interp);
-        obj.populate_caches(); % Clear caches
+        for fn = {'whitener','interp','convolver_','gramians_','whbasis_'}
+            if ~isempty(self.(fn{1})), obj.(fn{1}) = copy(self.(fn{1})); end
+        end
     end
 end
 methods
@@ -221,7 +220,7 @@ end
 % ------------------------------------------------------------------------------
 
 % Caches
-properties (Access=protected)
+properties (GetAccess=protected, SetAccess=private, Dependent)
     % Convolver object to use for convolution operations
     %
     % This has K*R kernels per channel, so convolver.kernels should be seen as a
@@ -234,16 +233,39 @@ properties (Access=protected)
     % [K*C x K*C x R] upper Cholesky decompositions of lag 0 Gram matrices to
     % use in getDelta()
     H_0
+    
+    % WhitenerBasis to use in unwhiten()
+    whbasis
 end
-methods (Access=protected)
-    function populate_caches(self)
-        % Populate the protected caches
-        %   populate_caches(self)
-        self.convolver = self.toConv();
-        self.gramians = self.toGram();
-        self.H_0 = self.compute_H0(self.gramians);
+methods
+    function x = get.convolver(self)
+        x = self.convolver_;
+        if isempty(x), x = self.toConv(); self.convolver_ = x; end
+    end
+    
+    function x = get.gramians(self)
+        x = self.gramians_;
+        if isempty(x), x = self.toGram(); self.gramians_ = x; end
+    end
+    
+    function x = get.H_0(self)
+        x = self.H_0_;
+        if isempty(x), x = self.compute_H0(self.gramians); self.H_0_ = x; end
+    end
+    
+    function x = get.whbasis(self)
+        x = self.whbasis_;
+        if isempty(x), x = self.toWhBasis(); self.whbasis_ = x; end
     end
 end
+properties (Access=protected)
+    % Actual storage location of these properties
+    convolver_
+    gramians_
+    H_0_
+    whbasis_
+end 
+
 methods (Static, Access=protected)
     function H0 = compute_H0(gramians)
         % Compute the Cholesky decomposition of the Gram matrices at lag 0
