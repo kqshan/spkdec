@@ -17,7 +17,6 @@
 % SpikeBasis methods:
 % Construction
 %   SpikeBasis  - Construct a new SpikeBasis object
-%   make_basis  - [Static] Initialize a SpikeBasis from detected spikes
 % Data conversions
 %   toConv      - Return a Convolver object for the whitened basis
 %   toKern      - Return a matrix of the whitened basis waveforms
@@ -181,11 +180,6 @@ methods
     delta = getDelta(self, convT_y);
     spk_X = solve(self, convT_y, spk_t, spk_r, varargin);
     spikes_raw = unwhiten(self, spikes_wh);
-end
-
-methods (Static)
-    % Initialization helper
-    obj = make_basis(spikes, K, varargin);
 end
 
 % ----------------------     Copy and serialization     ------------------------

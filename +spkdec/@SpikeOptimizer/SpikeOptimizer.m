@@ -14,9 +14,12 @@
 %   verbose     - Print status updates to stdout
 %
 % SpikeOptimizer methods:
-%   SpikeOptimizer - Construct a new SpikeOptimizer object  
+%   SpikeOptimizer  - Construct a new SpikeOptimizer object
 %   optimize    - Find a basis that minimizes reconstruction error
 %   unwhiten    - Find the raw waveform that approximates the whitened data
+% High-level operations
+%   makeBasis   - Construct a new SpikeBasis, optimized for the given spikes
+%   updateBasis - Update a given SpikeBasis from the given residuals
 % Object management
 %   copy        - Create a deep copy of this handle object
 %   saveobj     - Serialize a SpikeOptimizer object to struct
@@ -144,6 +147,9 @@ methods
     
     % Just a wrapper for WhitenerBasis.unwhiten
     spikes_raw = unwhiten(self, spikes_wh);
+    
+    % High-level operations
+    basis = makeBasis(self, spikes, K, varargin);
 end
 
 % ----------------------     Copy and serialization     ------------------------
