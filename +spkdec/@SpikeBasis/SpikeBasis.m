@@ -22,14 +22,18 @@
 %   toKern      - Return a matrix of the whitened basis waveforms
 %   toGram      - Return a Gramians object (dot products of the spike basis)
 %   toWhBasis   - Return a WhitenerBasis for this whitener and interp
+%   copy_nonWh  - Create a copy of this basis without whitening
 % Convolution
 %   conv        - Perform the forward convolution
 %   conv_spk    - Perform the forward convolution with a Spikes object
 %   convT       - Perform the transpose convolution
+% Spike manipulation
+%   reconst     - Reconstruct the waveforms of detected spikes
+%   spkNorms    - Return the whitened norms of detected spikes
+%   unwhiten    - Find the raw waveform that best approximate the given spikes
 % High-level operations
 %   getDelta    - Return the improvement in squared error from adding a spike
 %   solve       - Solve for the spike features given the spike times
-%   unwhiten    - Find the raw waveform that best approximate the given spikes
 % Object management
 %   copy        - Create a deep copy of this handle object
 %   saveobj     - Serialize a SpikeBasis object to struct
@@ -163,23 +167,30 @@ methods
     
     
     % Data conversions
-    
     kern = toKern(self, varargin);
     conv = toConv(self);
     gram = toGram(self);
     whbasis = toWhBasis(self, varargin);
     
     % Convolution
-    
     y = conv(self, x);
     y = conv_spk(self, spk, T);
     x = convT(self, y);
+    basis_nonWh = copy_nonWh(self);
+    
+    % Spike manipulation
+    spikes = reconst(self, spk, varargin);
+    norms = spkNorms(self, spk);
+    spikes_raw = unwhiten(self, spikes_wh);
     
     % High-level operations
-    
     delta = getDelta(self, convT_y);
     spk_X = solve(self, convT_y, spk_t, spk_r, varargin);
-    spikes_raw = unwhiten(self, spikes_wh);
+end
+
+methods (Static)
+    % Unit tests
+    test(varargin);
 end
 
 % ----------------------     Copy and serialization     ------------------------
@@ -204,6 +215,8 @@ methods
 end
 methods (Static)
     function obj = loadobj(s)
+        s.whitener = spkdec.Whitener.loadobj(s.whitener);
+        s.interp = spkdec.Interpolator.loadobj(s.interp);
         obj = spkdec.SpikeBasis(s.basis, rmfield(s,'basis'));
     end
 end
