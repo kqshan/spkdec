@@ -5,6 +5,7 @@
 %   symband_to_sparse - Convert a symmetric banded matrix to sparse format
 %   is_reg_max      - Determine which peaks are a regional maximum
 %   typeconv        - Convert a datatype based on some flags
+%   typecheck       - Check whether the datatype matches the given flags
 %
 % Other methods (Static):
 %   buildMex        - Compile the MEX files for these routines
@@ -20,6 +21,7 @@ methods (Static)
     spmat = symband_to_sparse(lbands);
     mask = is_reg_max(t, x, r);
     x = typeconv(x, flags);
+    tf = typecheck(x, flags);
 
     % MEX management
     buildMex(varargin);
