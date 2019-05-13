@@ -1,16 +1,16 @@
-function basis = init_spkbasis(optimizer, src, K, varargin)
+function [basis, spk] = init_spkbasis(optimizer, src, K, varargin)
 % Initialize a spike basis by detecting threshold-crossings in whitened data
-%   basis = init_spkbasis(optimizer, src, K, ... )
+%   [basis, spk] = init_spkbasis(optimizer, src, K, ... )
 %
 % Returns:
 %   basis       New SpikeBasis object
+%   spk         Detected spikes (Spikes object) where t is a shift in spike time
 % Required arguments:
 %   optimizer   SpikeOptimizer object used to optimize the spike basis
 %   src         DataSrc object to read from
 %   K           Number of spike basis waveforms per channel
 % Parameters (key/value pairs) [default]:
 %   t0          Sample index (1..L) corresponding to t=0    [ 1 ]
-%   flip_signs  Flip signs so feature means are positive    [ true ]
 %   det_quant   Spike detection quantile                    [ 0.995 ]
 %   det_val     Spike detection threshold                   [use det_quant]
 %   batch_size  Size (#samples) of each batch               [ 256k ]
@@ -34,7 +34,6 @@ errid_arg = 'spkdec:util:init_spkbasis:BadArg';
 % Optional parameters
 ip = inputParser();
 ip.addParameter('t0', 1, @isscalar);
-ip.addParameter('flip_signs', true, @isscalar);
 ip.addParameter('det_quant', 0.995, @isscalar);
 ip.addParameter('det_val', [], @(x) isempty(x) || isscalar(x));
 ip.addParameter('batch_size', 256*1024, @isscalar);
@@ -118,6 +117,6 @@ if verbose, fprintf('%d spikes detected\n',N); end
 
 %% Initialize the basis waveforms
 
-basis = optimizer.makeBasis(spikes, K, 't0',t0, 'flip_signs',prm.flip_signs);
+[basis, spk] = optimizer.makeBasis(spikes, K, 't0',t0);
 
 end
