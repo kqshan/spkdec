@@ -24,6 +24,7 @@
 %
 % WhitenerBasis methods:
 %   WhitenerBasis - Constructor
+%   whiten    - Whiten a waveform of length L
 %   unwhiten  - Return the raw waveform that minimizes the whitened error
 % Object management
 %   copy      - Create a deep copy of this handle object
@@ -85,7 +86,7 @@ properties (SetAccess=protected)
     %
     % This is used in the following operations:
     % * Constructing map_21r requires inverting wh_02
-    % * Member function unwhiten() requires inverting wh_01 or wh_01r
+    % * Member function unwhiten() requires inverting wh_01
     %
     % In these cases, the matrix being inverted (let's call it X) will be
     % replaced by:
@@ -93,9 +94,8 @@ properties (SetAccess=protected)
     %   sig = diag(Sigma);
     %   X_new = U * diag(max(sig, sig(1)/max_cond)) * V'
     %
-    % Of these above cases, we typically have
-    %   cond(wh_02) < cond(wh_01) = cond(wh_01r(:,:,1)) < cond(wh_01r(:,:,R))
-    % so it's the unwhiten() method that is most likely to be affected by this.
+    % We typically have cond(wh_02) < cond(wh_01), so it's the unwhiten() method
+    % that is more likely to be affected by this.
     max_cond
 end
 
@@ -272,14 +272,14 @@ methods
         % Optional parameters (key/value pairs) [default]:
         %   interp    Interpolator object               [ none ]
         %   L         Waveform length (#samples)        [defer to interp]
-        %   method    Decomposition method              ['svd']
+        %   method    Decomposition method              ['qr']
         %   max_cond  Maximum condition number          [ 300 ]
         %
         % Either 'L' or 'interp' needs to be provided
         ip = inputParser();
         ip.addParameter('interp', []);
         ip.addParameter('L', [], @(x) isempty(x) || isscalar(x));
-        ip.addParameter('method', 'svd', @ischar);
+        ip.addParameter('method', 'qr', @ischar);
         ip.addParameter('max_cond', 300, @isscalar);
         ip.parse( varargin{:} );
         prm = ip.Results;
@@ -305,14 +305,15 @@ methods
     end
     
     % Math
-    resid_raw = unwhiten(self, resid_wh, spk_r);
+    Y_wh = whiten(self, Y_raw);
+    [Y_raw, norms] = unwhiten(self, Y_wh);
 end
 
 % ----------------------     Copy and serialization     ------------------------
 
 methods (Access=protected)
     function obj = copyElement(self)
-        obj = copyElement@matlab.mixin.copyable(self);
+        obj = copyElement@matlab.mixin.Copyable(self);
         obj.whitener = copy(self.whitener);
         obj.interp = copy(self.interp);
     end
