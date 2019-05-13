@@ -1,18 +1,17 @@
-function [basis, spk] = optimize(self, data, varargin)
+function [basis, spk, resid] = optimize(self, data, varargin)
 % Find a spike waveform basis that minimizes the reconstruction error
-%   [basis, spk] = optimize(self, data, ...)
+%   [basis, spk, resid] = optimize(self, data, ...)
 %
 % Returns:
 %   basis       [L x K x C] optimized spike basis waveforms
 %   spk         Spikes object (where t is the shift in detected spike time)
+%   resid       [L+W-1 x C x N] spike residuals (whitened) after optimization
 % Required arguments:
-%   data        [L+W-1 x C x N] detected spikes in whitened space or
-%               [L x C x N] "unwhitened" spikes (see SpikeOptimizer.unwhiten)
+%   data        [L+W-1 x C x N] detected spike waveforms (whitened)
 % Optional parameters (key/value pairs) [default]:
 %   lambda      Proximal regularizer weight                 [ 0 ]
 %   basis_prev  Previous basis (for proximal regularizer)   [ none ]
 %   K           Number of basis waveforms per channel     [defer to basis_prev]
-%   is_wh       Whether the given spikes are whitened       [ auto ]
 %
 % This finds the basis waveforms and spike fetaures to solve:
 %     minimize    ||data - basis*spk.X||^2 + lambda*||basis-basis_prev||^2
@@ -23,8 +22,6 @@ function [basis, spk] = optimize(self, data, varargin)
 % search over available full- and/or sub-sample shifts in the detected spike
 % times. This reduces the incentive to represent such shifts using the spike
 % basis itself.
-%
-% See also: spkdec.SpikeOptimizer.unwhiten
 
 
 % --------------------     Problem description     ------------------------
@@ -118,12 +115,11 @@ ip = inputParser();
 ip.addParameter('lambda', 0, @isscalar);
 ip.addParameter('basis_prev', []);
 ip.addParameter('K', [], @(x) isempty(x) || isscalar(x));
-ip.addParameter('is_wh', [], @(x) isempty(x) || isscalar(x));
 ip.parse( varargin{:} );
 prm = ip.Results;
 
 % Convert the given spikes into Q1 coordinates
-self.Y = self.convert_spikes_to_Y(data, prm.is_wh);
+self.Y = self.convert_spikes_to_Y(data);
 
 % Get a starting spike basis
 if isempty(prm.basis_prev)
@@ -189,14 +185,19 @@ end
 
 
 % Convert the basis back into raw waveforms
-basis = zeros(L, K, C);
-for c = 1:C
-    basis(:,:,c) = self.whbasis.wh_02(:,:,c) \ A(:,:,c);
-end
+basis = self.convert_A_to_spkbasis(A);
 
 % Construct the Spikes object
 spk_t = X.s - (self.dt_search+1);
 spk = spkdec.Spikes(spk_t, X.r, X.X);
+
+% Compute the residual
+if nargout >= 3
+    resid = self.eval_error(A, X);  % [L*C x N] in Q1 coordinates
+    Lw = L + self.W-1;
+    resid = reshape(self.whbasis.Q1,[Lw*C,L*C]) * resid;
+    resid = reshape(resid, [Lw, C, spk.N]);
+end
 
 % Cleanup
 self.verbose_cleanup();

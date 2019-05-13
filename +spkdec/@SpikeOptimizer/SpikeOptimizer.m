@@ -19,7 +19,7 @@
 %   unwhiten    - Find the raw waveform that approximates the whitened data
 % High-level operations
 %   makeBasis   - Construct a new SpikeBasis, optimized for the given spikes
-%   updateBasis - Update a given SpikeBasis from the given residuals
+%   updateBasis - Update a spike basis using proximal gradient descent
 % Object management
 %   copy        - Create a deep copy of this handle object
 %   saveobj     - Serialize a SpikeOptimizer object to struct
@@ -143,13 +143,14 @@ methods
     
     
     % Main optimization routine
-    [basis, spk_X] = optimize(self, spikes, varargin);
+    [basis, spk, resid] = optimize(self, spikes, varargin);
     
     % Just a wrapper for WhitenerBasis.unwhiten
     spikes_raw = unwhiten(self, spikes_wh);
     
     % High-level operations
-    basis = makeBasis(self, spikes, K, varargin);
+    [basis, spk] = makeBasis(self, spikes, K, varargin);
+    [basis, spk] = updateBasis(self, basis, spk, resid, varargin);
 end
 
 % ----------------------     Copy and serialization     ------------------------
@@ -185,7 +186,7 @@ end
 
 methods (Access=protected)
     % Initialization
-    Y = convert_spikes_to_Y(self, spikes, is_wh);
+    Y = convert_spikes_to_Y(self, spikes);
     A0 = init_spkbasis(self, K);
     
     % Optimize spikes with basis held constant
@@ -196,6 +197,14 @@ methods (Access=protected)
     grad = compute_gradient(self, A, X);
     A = prox_grad_step(self, A, grad);
     step_ok = eval_step(self, A, prev_A, X);
+    
+    % Convert from the whitened Q2 coordinates back to raw waveforms
+    basis = convert_A_to_spkbasis(self, A);
+end
+
+% Other helpers
+methods (Access=protected)
+    spikes = reconstruct_spikes(self, basis, spk, resid);
 end
 
 

@@ -1,12 +1,11 @@
-function Y = convert_spikes_to_Y(self, spikes, is_wh)
+function Y = convert_spikes_to_Y(self, spikes)
 % Convert the given spikes into coordinates in the Q1 basis
-%   Y = convert_to_Q1(self, spikes, is_wh)
+%   Y = convert_to_Q1(self, spikes)
 %
 % Returns:
 %   Y         [L*C x N x S] spikes (+/- dt_search) in the Q1 basis
 % Required arguments:
-%   spikes    [L+W-1 x C x N] whitened or [L x C x N] unwhitened spikes
-%   is_wh     Whether the given spikes are whitened, or [] to auto-infer
+%   spikes    [L+W-1 x C x N] whitened spike waveforms
 %
 % S = 2*self.dt_search + 1 and is the number of full-sample data shifts that we
 % are going to be searching over during the spike optimization step. The S
@@ -14,29 +13,10 @@ function Y = convert_spikes_to_Y(self, spikes, is_wh)
 
 % Check the given dimensions
 L = self.L; C = self.C; Lw = L+self.W-1;
-[L_, C_, N] = size(spikes);
+[Lw_, C_, N] = size(spikes);
+assert(Lw_==Lw, self.errid_dim, 'spikes must have length L+W-1=%d',Lw);
 assert(C_==C, self.errid_dim, 'spikes must have C=%d channels',C);
-
-% Infer is_wh
-if isempty(is_wh)
-    assert(self.W > 1, self.errid_arg, ['Since self.W==1, we cannot ' ...
-        'automatically determine whether the given spikes are whitened']);
-    if L_==L
-        is_wh = false;
-    elseif L_==Lw
-        is_wh = true;
-    else
-        error(self.errid_dim, 'size(spikes,1) must either be L or L+W-1');
-    end
-end
-
-% Start by whitening the spikes
 whbasis = self.whbasis;
-if ~is_wh
-    spikes = reshape(spikes, [L*C, N]);
-    spikes = reshape(whbasis.wh_00, [Lw*C, L*C]) * spikes;
-    spikes = reshape(spikes, [Lw, C, N]);       % [Lw x C x N]
-end
 
 % Shift and convert into the Q1 basis
 dt_list = (-self.dt_search:self.dt_search);
