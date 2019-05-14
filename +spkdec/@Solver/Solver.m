@@ -1,6 +1,7 @@
 % Greedy solver (orthogonal matching pursuit) for sparse deconvolution problems
 %
 % Solver properties:
+%   det_thresh  - Spike detection threshold (relative to K*C)
 %   det_refrac  - Refractory period (#samples) for spike detection
 %   coh_thresh  - Mutual coherence threshold used within an OMP iteration
 %   gram_thresh - Threshold to consider a Gram matrix negligible
@@ -9,6 +10,7 @@
 % Solver methods:
 %   Solver      - Constructor
 %   solve       - Find x minimizing phi(x) = ||A*x-b||^2 + beta*nnz(x)
+%   detect      - Wrapper for solve() that performs additional postprocessing
 % Object management
 %   copy        - Create a copy of this handle object
 %   saveobj     - Serialize a Solver object to struct
@@ -22,6 +24,24 @@ classdef Solver < matlab.mixin.Copyable
 
 
 properties
+    % Spike detection threshold (relative to K*C)
+    %
+    % The solve() method seeks to minimize ||A*x-b||^2 + beta*nnz_cols(x), where
+    % A is the convolutional spike basis, x is the column-sparse matrix of spike
+    % features, nnz_cols(x) returns the number of nonzero columns in x, and
+    % beta is a parameter that controls the sparsity of the solution.
+    %
+    % Specifically, this will detect a spike only if adding the spike will
+    % improve our squared reconstruction error by more than <beta>. If
+    % det_refrac == 0, then this also guarantees that ||A'*residual|| < beta.
+    %
+    % beta = K*C * det_thresh. This alternative parameterization is useful
+    % because ||A'*z||, where z is taken from a standard multivariate normal
+    % distribution, is chi-squared distributed with K*C degrees of freedom, so
+    % this can be a more convenient way to think about false positive rates.
+    % Default = 10
+    det_thresh = 10;
+    
     % Refractory period (#samples) for spike detection
     %
     % This solver will not detect any spikes within +/- det_refrac samples of
@@ -84,7 +104,10 @@ methods
     end
     
     % The main solve() method
-    [spk, resid] = solve(self, A, b, beta);
+    [spk, resid] = solve(self, A, b);
+    
+    % A wrapper for solve() that performs some postprocessing
+    [spk, lims, resid] = detect(self, basis, data, varargin);
 end
 
 % ----------------------     Copy and serialization     ------------------------

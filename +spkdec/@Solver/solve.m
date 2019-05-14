@@ -1,6 +1,6 @@
-function [spk, resid] = solve(self, A, b, beta)
+function [spk, resid] = solve(self, A, b)
 % Solve the sparse deconvolution problem for the given kernels and data
-%   [spk, resid] = solve(self, A, b, beta)
+%   [spk, resid] = solve(self, A, b)
 %
 % Returns:
 %   spk     Detected spikes (Spikes object)
@@ -8,12 +8,16 @@ function [spk, resid] = solve(self, A, b, beta)
 % Required arguments:
 %   A       Convolution kernels (SpikeBasis object)
 %   b       [T+V x C] whitened data to deconvolve
-%   beta    Cost of each additional nonzero spike
 %
 % This uses orthogonal matching pursuit to solve the optimization problem
 %   minimize  ||b - A.conv(spk)||^2 + beta*spk.N
+% where beta = A.K * A.C * self.det_thresh.
+%
+% The detected spike times are based on a purely causal convolution, so spk.t
+% corresponds to the start of the whitened waveform.
 
 % Initialize the loop
+beta = A.K * A.C * self.det_thresh;
 self.consts_init(A,b,beta); % Populate cache of problem-specific constants
 self.verbose_init();        % Start the verbose output
 spk = spkdec.Spikes();      % Start with no spikes detected
