@@ -10,6 +10,7 @@
 % Interpolator methods:
 %   interp      - Interpolate a [L x 1] vector to an [R*L x 1] vector
 %   shift       - Apply the selected shift to the given [L x 1] vector
+%   shiftArr    - Apply the selected shifts to an [L x C x N] data array
 % Construction
 %   Interpolator - Construct a new Interpolator object, given shift matrices
 %   make_interp  - [Static] Make an Interpolator using a variety of methods
@@ -65,7 +66,7 @@ properties (SetAccess=protected)
     %   shifted_vector = shifts(:,:,r) * input_vector
     % If this object was created using Interpolator.make_interp(), then
     % shifts(:,:,1) will be an identity matrix, and the subsequent matrices
-    % shift the waveform forward in time by fractions of a sample.
+    % shift the waveform backwards in time by fractions of a sample.
     shifts
 end
 
@@ -105,7 +106,8 @@ methods
     
     % Main interpolation methods
     y = interp(self, x);
-    y = shift(self, x, r);
+    y = shift(self, x, r, trans);
+    Y = shiftArr(self, X, r, trans);
 end
 
 methods (Static)
