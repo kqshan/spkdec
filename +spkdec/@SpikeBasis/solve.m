@@ -51,7 +51,7 @@ kctr = kc(:) + tr';                 % [K*C x N] index
 Aty = convT_y(kctr);
 
 % A'*A
-AtA_bands = self.gramians.getGramSeq(spk_t, spk_r, 'thresh',prm.thresh);
+AtA_bands = self.toGram().getGramSeq(spk_t, spk_r, 'thresh',prm.thresh);
 
 % Solve x = (A'*A) \ (A'*y)
 spk_X = spkdec.Math.pbsolve(AtA_bands, Aty(:));

@@ -7,6 +7,11 @@ function y = conv_spk(self, spk, T)
 % Required arguments:
 %   spk     Sparse representation of the spike features (Spikes object)
 %   T       Overall feature length (#samples)
+%
+% A note on spike times:
+% To keep things simple, this uses a purely causal convolution. This means that
+% the spike times (spk.t) correspond to the start of the whitened waveform,
+% rather than what you might consider the spike center.
 
 % Convert the spikes object to a [T x K x R x C] array
 x = spk.toFull(T, self);

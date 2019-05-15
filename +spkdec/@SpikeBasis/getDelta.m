@@ -39,8 +39,8 @@ assert(K==self.K && R==self.R && C==self.C, self.errid_dim, ...
 % the resulting Q matrix will not have the same channel-specific structure as A,
 % and we won't be able to compute its convolution as efficiently.
 
-
 % Compute each sub-sample shift index separately
+H_0 = self.get_gram_chol();
 delta = zeros(R, T, 'like',convT_y);
 for r = 1:R
     % Extract and reshape the relevant data
@@ -49,7 +49,7 @@ for r = 1:R
     % Solve for H*x = H'\Aty
     % Except a bunch of things are transposed, and se we actually want
     %   Hx = (H*x).' = (H' \ Aty_r.').' = Aty_r / conj(H)
-    H = self.H_0(:,:,r);
+    H = H_0(:,:,r);
     Hx = Aty_r / conj(H);               % [T x K*C]
     % Evaluate its norm
     delta(r,:) = sum(abs(Hx).^2, 2)';

@@ -17,12 +17,13 @@
 % SpikeBasis methods:
 % Construction
 %   SpikeBasis  - Construct a new SpikeBasis object
+%   copy_modify - Create a copy with a modified basis
+%   copy_nonWh  - Create a copy of this basis without whitening
 % Data conversions
 %   toConv      - Return a Convolver object for the whitened basis
 %   toKern      - Return a matrix of the whitened basis waveforms
 %   toGram      - Return a Gramians object (dot products of the spike basis)
 %   toWhBasis   - Return a WhitenerBasis for this whitener and interp
-%   copy_nonWh  - Create a copy of this basis without whitening
 % Convolution
 %   conv        - Perform the forward convolution
 %   conv_spk    - Perform the forward convolution with a Spikes object
@@ -30,7 +31,6 @@
 % Spike manipulation
 %   reconst     - Reconstruct the waveforms of detected spikes
 %   spkNorms    - Return the whitened norms of detected spikes
-%   unwhiten    - Find the raw waveform that best approximate the given spikes
 % High-level operations
 %   getDelta    - Return the improvement in squared error from adding a spike
 %   solve       - Solve for the spike features given the spike times
@@ -165,23 +165,24 @@ methods
         obj.interp = interp;
     end
     
+    % Various forms of copy constructors
+    basis_mod = copy_modify(self, newbasis);
+    basis_nonWh = copy_nonWh(self);
     
     % Data conversions
     kern = toKern(self, varargin);
     conv = toConv(self);
     gram = toGram(self);
-    whbasis = toWhBasis(self, varargin);
+    whbasis = toWhBasis(self);
     
     % Convolution
     y = conv(self, x);
     y = conv_spk(self, spk, T);
     x = convT(self, y);
-    basis_nonWh = copy_nonWh(self);
     
     % Spike manipulation
     spikes = reconst(self, spk, varargin);
     norms = spkNorms(self, spk);
-    spikes_raw = unwhiten(self, spikes_wh);
     
     % High-level operations
     delta = getDelta(self, convT_y);
@@ -198,7 +199,7 @@ end
 methods (Access=protected)
     function obj = copyElement(self)
         obj = copyElement@matlab.mixin.Copyable(self);
-        for fn = {'whitener','interp','convolver_','gramians_','whbasis_'}
+        for fn = {'whitener','interp','convolver','gramians','whbasis'}
             if ~isempty(self.(fn{1})), obj.(fn{1}) = copy(self.(fn{1})); end
         end
     end
@@ -227,69 +228,41 @@ end
 % ------------------------------------------------------------------------------
 
 % Caches
-properties (GetAccess=protected, SetAccess=private, Dependent)
-    % Convolver object to use for convolution operations
+properties (Access=protected)
+    % Convolver object, output of toConv() and used in solve()
     %
     % This has K*R kernels per channel, so convolver.kernels should be seen as a
     % a [L x K x R x C] matrix that has been reshaped to [L x K*R x C].
     convolver
     
-    % Gramians object to use in solve()
+    % Gramians object, output of toGram() and used in solve()
     gramians
     
-    % [K*C x K*C x R] upper Cholesky decompositions of lag 0 Gram matrices to
-    % use in getDelta()
+    % [K*C x K*C x R] upper Cholesky decompositions of lag 0 Gram matrices,
+    % output of get_gram_chol() and used in getDelta() and spkNorms()
     H_0
     
-    % WhitenerBasis to use in unwhiten()
+    % WhitenerBasis object, output of toWhBasis()
     whbasis
 end
-methods
-    function x = get.convolver(self)
-        x = self.convolver_;
-        if isempty(x), x = self.toConv(); self.convolver_ = x; end
-    end
-    
-    function x = get.gramians(self)
-        x = self.gramians_;
-        if isempty(x), x = self.toGram(); self.gramians_ = x; end
-    end
-    
-    function x = get.H_0(self)
-        x = self.H_0_;
-        if isempty(x), x = self.compute_H0(self.gramians); self.H_0_ = x; end
-    end
-    
-    function x = get.whbasis(self)
-        x = self.whbasis_;
-        if isempty(x), x = self.toWhBasis(); self.whbasis_ = x; end
-    end
-end
-properties (Access=protected)
-    % Actual storage location of these properties
-    convolver_
-    gramians_
-    H_0_
-    whbasis_
-end 
 
-methods (Static, Access=protected)
-    function H0 = compute_H0(gramians)
+methods (Access=protected)
+    function H0 = get_gram_chol(self)
         % Compute the Cholesky decomposition of the Gram matrices at lag 0
-        %   H0 = compute_H0(gramians)
+        %   H_0 = get_gram_chol(self)
         %
         % Returns:
-        %   H0          [K*C x K*C x R] upper Cholesky decompositions
-        % Required arguments:
-        %   gramians    Gramians object
-        KC = gramians.D; R = gramians.R;
-        H0 = zeros(KC, KC, R);
-        for r = 1:R
-            G = gramians.getGram(0, r, r);
-            H0(:,:,r) = chol(G, 'upper');
+        %   H_0     [K*C x K*C x R] upper Cholesky decompositions
+        %           of self.toGram().getGram(0,r,r)
+        H0 = self.H_0;
+        if ~isempty(H0), return; end
+        gram = self.toGram();
+        H0 = zeros(gram.D, gram.D, gram.R);
+        for r = 1:gram.R
+            H0(:,:,r) = chol(gram.getGram(0,r,r), 'upper');
         end
+        self.H_0 = H0;
     end
 end
-
 
 end

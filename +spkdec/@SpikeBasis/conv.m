@@ -16,6 +16,6 @@ assert(K==self.K && R==self.R && C==self.C, self.errid_dim, ...
 x = reshape(x, [T, K*R, C]);
 
 % Perform the convolution
-y = self.convolver.conv(x);
+y = self.toConv().conv(x);
 
 end

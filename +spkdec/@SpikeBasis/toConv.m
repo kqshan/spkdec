@@ -5,6 +5,10 @@ function conv = toConv(self)
 % This Convolver object has K*R kernels per channel, so conv.kernels should be
 % interpreted as a reshaped version of a [L x K x R x C] array.
 
+% Use the cache if available
+conv = self.convolver;
+if ~isempty(conv), return; end
+
 % Dimensions
 [L, K, C] = size(self.basis);
 whitener = self.whitener;
@@ -31,5 +35,8 @@ end
 % Construct the Convolver object
 wh_t0 = self.t0 + whitener.delay;
 conv = spkdec.Convolver(kern, 'wh_ch',whitener.wh_ch, 't0',wh_t0);
+
+% Cache this result
+self.convolver = conv;
 
 end

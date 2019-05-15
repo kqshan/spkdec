@@ -58,8 +58,7 @@ end
     'lambda',lambda, 'basis_prev',basis_old);
 
 % Construct the SpikeBasis object
-basis_obj = spkdec.SpikeBasis(basis_new, 't0',basis.t0, ...
-    'whitener',basis.whitener, 'interp',basis.interp);
+basis_obj = basis.copy_modify(basis_new);
 
 % spk_new.t is currently spike offsets, so add these to the original spk.t
 spk_new.shiftTimes(spk.t);

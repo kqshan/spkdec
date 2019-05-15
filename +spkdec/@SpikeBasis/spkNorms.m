@@ -13,7 +13,7 @@ function norms = spkNorms(self, spk)
 
 % H(:,:,r) is the upper Cholesky decomposition of the 0-lag Gramian for
 % the sub-sample shift index r, so ||H*X|| = ||self.reconst(X)||
-H = self.H_0;
+H = self.get_gram_chol();
 
 % Compute the norm for each sub-sample shift
 R = self.R; N = spk.N;

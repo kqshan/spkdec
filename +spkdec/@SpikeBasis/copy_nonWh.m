@@ -6,6 +6,6 @@ function basis_nonWh = copy_nonWh(self)
 %   basis_nonWh     SpikeBasis without whitening
 
 basis_nonWh = spkdec.SpikeBasis(self.basis, 't0',self.t0, ...
-    'whitener',self.whitener, 'interp',self.interp);
+    'whitener',spkdec.Whitener.no_whiten(self.C), 'interp',self.interp);
 
 end
