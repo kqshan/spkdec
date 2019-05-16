@@ -5,10 +5,9 @@ function [spk, lims, resid] = detect(self, basis, data, varargin)
 % Returns:
 %   spk         Spike times and features (Spikes object)
 %   lims        [first,last] data index (1..T-V) where detection was attempted
-%   residuals   Struct of residuals (fields determined by 'residual' parameter)
+%   resid       Struct of residuals (fields determined by 'residual' parameter)
 %     data        [T x C] residuals: data - basis.conv_spk(spikes.spk)
 %     spk         [L+W-1 x C x N] spike-centered residuals
-%     spk_unwh    [L x C x N] unwhitened residuals (see SpikeBasis.unwhiten)
 % Required arguments:
 %   basis       Spike waveform basis (SpikeBasis object)
 %   data        [T x C] whitened data to detect spikes in
@@ -88,19 +87,13 @@ if ismember('data',resid_names)
     resid.data = data_resid;
 end
 % Spike-centered whitened residuals
-if any(startsWith(resid_names,'spk'))
+if ismember('spk',resid_names)
     N = spk.N;
     extract_idx = (0:V)' + spk.t';              % [L+W-1 x N]
     spk_resid = data_resid(extract_idx(:), :);  % [(L+W-1)*N x C]
     spk_resid = reshape(spk_resid,[V+1, N, C]); % [L+W-1 x N x C]
     spk_resid = permute(spk_resid,[1 3 2]);     % [L+W-1 x C x N]
-end
-if ismember('spk',resid_names)
     resid.spk = spk_resid;
-end
-% Unwhitened
-if ismember('spk_unwh',resid_names)
-    resid.spk_unwh = basis.unwhiten(spk_resid);
 end
 
 end
