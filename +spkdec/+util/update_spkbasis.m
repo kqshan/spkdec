@@ -7,7 +7,7 @@ function [basis_new, spk_new] = update_spkbasis(basis, src, varargin)
 %   spk         Detected spikes (Spikes object)
 % Required arguments:
 %   basis       Original spike basis waveforms (SpikeBasis object)
-%   src         DataSrc object to read from
+%   data        [Inf x C] DataSrc object to read raw data from
 % Optional parameters (key/value pairs) [default]:
 %   solver      Solver object to detect spikes with         [ auto ]
 %   optimizer   SpikeOptimizer object to use                [ auto ]
@@ -69,7 +69,7 @@ end
 
 % Get some dimensions and local variables
 C = basis.C; L = basis.L; W = basis.W;
-assert(src.C == C, errid_dim, 'Must have basis.C == src.C');
+assert(src.hasShape([Inf C]), errid_dim, 'src.shape must be [Inf x C]');
 Lw = L + W - 1;
 whitener = basis.whitener;
 filt_delay = whitener.delay;

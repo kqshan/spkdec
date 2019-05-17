@@ -7,7 +7,7 @@ function [basis, spk] = init_spkbasis(optimizer, src, K, varargin)
 %   spk         Detected spikes (Spikes object) where t is a shift in spike time
 % Required arguments:
 %   optimizer   SpikeOptimizer object used to optimize the spike basis
-%   src         DataSrc object to read from
+%   data        [Inf x C] DataSrc object to read raw data from
 %   K           Number of spike basis waveforms per channel
 % Parameters (key/value pairs) [default]:
 %   t0          Sample index (1..L) corresponding to t=0    [ 1 ]
@@ -44,7 +44,7 @@ prm = ip.Results;
 
 % Check dimensions
 C = optimizer.C;
-assert(src.C == C, errid_dim, 'Must have optimizer.C == src.C');
+assert(src.hasShape([Inf C]), errid_dim, 'src.shape must be [Inf x C]');
 W = optimizer.W;
 L = optimizer.L;
 Lw = L + W - 1;

@@ -5,7 +5,7 @@ function basis = make_spkbasis(src, whitener, varargin)
 % Returns:
 %   basis       SpikeBasis object fitted to the given source
 % Required arguments:
-%   src         DataSrc object to read from
+%   src         [Inf x C] DataSrc object to read raw data from
 %   whitener    Whitener object for measuring approximation error
 % Optional parameters (key/value pairs) [default]:
 %   solver      Solver object for spike detection               [ auto ]

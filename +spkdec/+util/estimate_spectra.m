@@ -8,7 +8,7 @@ function spect = estimate_spectra(data, varargin)
 %     mag         [F x C] signal magnitude (see below)
 %     psd         [F x C] one-sided power spectral density (PSD)
 % Required arguments:
-%   data        DataSrc object. Assumed to be purely real (not complex)
+%   data        [Inf x C] DataSrc object to read raw data from
 % Optional parameters (key/value pairs) [default]:
 %   N_fft       FFT size                                      [ 4096 ]
 %   winfunc     Function handle to generate the FFT window    [ @hann ]

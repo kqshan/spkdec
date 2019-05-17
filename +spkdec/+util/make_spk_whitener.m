@@ -13,7 +13,7 @@ function [wh, specs] = make_spk_whitener(data, varargin)
 %     ch_cov      [C x C] estimated cross-channel covariance of filtered data
 %
 % Required arguments:
-%   data        DataSrc object. The data must be real (not complex)
+%   data        [Inf x C] DataSrc object to read raw data from
 %
 % Optional parameters (key/value pairs) [default]:
 %   N_fft       FFT size used to design whitening filter        [ 4096 ]
@@ -69,6 +69,11 @@ assert(n1 >= 0 && n2 >= 0, errid_arg, 'bp_order must be >= 0');
 N = prm.N_fft;
 assert(L < N/3, errid_arg, ['filt_len must be much less than N_fft.' ...
     '\nAs a rule of thumb, we are requiring filt_len < N_fft/3']);
+
+% Make sure we have a [T x C] data source (and not inadvertently transposed)
+src_shape = data.shape;
+assert(length(src_shape)==2 && isinf(src_shape(1)) && ~isinf(src_shape(2)), ...
+    errid_arg, 'Given data.shape must be [Inf x C]');
 
 %% Do the thing
 

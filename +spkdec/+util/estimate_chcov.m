@@ -5,7 +5,7 @@ function ch_cov = estimate_chcov(data, varargin)
 % Returns:
 %   ch_cov      [C x C] estimated cross-channel noise covariance
 % Required arguments:
-%   data        DataSrc object
+%   data        [Inf x C] DataSrc object to read raw data from
 % Optional parameters (key/value pairs) [default]:
 %   filter      [W x 1] or [W x C] data filter to apply     [ none ]
 %   cap_val     Data value to truncate the source data to   [use cap_quant]
