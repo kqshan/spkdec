@@ -11,6 +11,7 @@ function detect_spikes(basis, source, outputs, varargin)
 %   solver      Solver object to perform detection with     [spkdec.Solver()]
 %   det_thresh  Spike detection threshold                   [defer to solver]
 %   det_refrac  Spike detection refractory period           [defer to solver]
+%   rewind      Rewind the data source before startnig      [ true ]
 %   batch_size  Batch size for processing                   [ 1M ]
 %   verbose     Print status updates to stdout              [ false ]
 %   vb_period   Verbose update period (sec)                 [ 30 ]
@@ -19,10 +20,10 @@ function detect_spikes(basis, source, outputs, varargin)
 %   feature     [D x N] spike features (D = basis.K*basis.C)
 %   index       [N] spike times (1..source.T) for spike center (basis.t0)
 %   subidx      [N] sub-sample shift index (1..basis.R)
-%   relnorm     [N] spike norm relative to the detection threshold
+%   spknorm     [N] spike norm (in whitened space)
 %   resid       [L+W-1 x C x N] whitened residual around each spike
 %   data_resid  [T x C] data residual (raw data - detected spikes)
-% Missing or empty output fields are ignored.
+% Missing or empty fields are ignored. See also io.make_detection_outputs().
 %
 % Notes:
 % * This will not detect spikes within the first 2*filt_delay + t0-1 samples or
@@ -34,6 +35,8 @@ function detect_spikes(basis, source, outputs, varargin)
 %   backwards shifts by a fraction of a sample, and hence
 %       spk_t = outputs.index + (outputs.subidx - 1)/basis.R
 %   provides the spike time with temporal superresolution.
+%
+% See also: spkdec.io.make_detection_outputs
 
 t_func_start = tic();
 errid_pfx = 'spkdec:util:detect_spikes';
@@ -45,6 +48,7 @@ ip = inputParser();
 ip.addParameter('solver', [], @(x) isempty(x) || isa(x,'spkdec.Solver'));
 ip.addParameter('det_thresh', [], @(x) isempty(x) || isscalar(x));
 ip.addParameter('det_refrac', [], @(x) isempty(x) || isscalar(x));
+ip.addParameter('rewind', true, @isscalar);
 ip.addParameter('batch_size', pow2(20), @isscalar);
 ip.addParameter('verbose', false, @isscalar);
 ip.addParameter('vb_period', 30, @isscalar);
@@ -83,10 +87,13 @@ spk_offset_wh = spk_offset+filt_delay;
 % Check the input
 errid_dim = [errid_pfx ':DimMismatch'];
 assert(source.hasShape([Inf C]), errid_dim, 'source.shape must be [Inf x C]');
+if prm.rewind
+    source.read(1,0);
+end
 
 % Check the output dimensions and make sure each has a field
 output_check = {'feature',[D Inf]; 'index',[Inf]; 'subidx',[Inf]; ...
-    'relnorm',[Inf]; 'resid',[Lw C Inf]; 'data_resid',[Inf C]}; %#ok<NBRAK>
+    'spknorm',[Inf]; 'resid',[Lw C Inf]; 'data_resid',[Inf C]}; %#ok<NBRAK>
 for ii = 1:size(output_check,1)
     [fname, dims] = deal(output_check{ii,:});
     if ~isfield(outputs,fname)
@@ -218,6 +225,7 @@ while ~is_last_batch
             t_update = tic();
         end
     end
+    
     % These are taken (almost) directly from the detection output
     if ~isempty(outputs.feature)    % feature = spk.X
         outputs.feature.append(spk.X);
@@ -231,12 +239,8 @@ while ~is_last_batch
     if ~isempty(outputs.resid)      % resid = resid.spk
         outputs.resid.append(resid.spk);
     end
-    
-    % Spike norm relative to the detection threshold
-    if ~isempty(outputs.relnorm)
-        spknorm = basis.spkNorms(spk);
-        thresh = sqrt(solver.det_thresh * D); % See spkdec.Solver.det_thresh
-        outputs.relnorm.append(spknorm / thresh);
+    if ~isempty(outputs.spknorm)
+        outputs.spknorm.append(basis.spkNorms(spk));
     end
     
     % Non-whitened residual
