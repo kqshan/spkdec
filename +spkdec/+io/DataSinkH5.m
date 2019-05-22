@@ -55,19 +55,14 @@ methods
         addl_args = ip.Unmatched;
         % See if the file and/or dataset already exists
         dsname = prm.dsname;
-        ds_info = [];
         if exist(filename,'file')
             assert(prm.old_file_ok, errid_arg, ...
                 'File "%s" already exists; aborting', filename);
-            try
-                ds_info = h5info(filename, dsname);
-            catch mexc
-                if ~strcmp(mexc.identifier,'MATLAB:imagesci:h5info:unableToFind')
-                    rethrow(mexc);
-                end
-            end
+            ds_info = read_ds_info(filename, dsname);
             assert(isempty(ds_info) || prm.old_ds_ok, errid_arg, ...
                 '%s already contains dataset "%s"; aborting', filename, dsname);
+        else
+            ds_info = [];
         end
         % Call the superclass constructor
         obj = obj@spkdec.DataSink(shape);
@@ -112,4 +107,22 @@ methods (Access=protected)
     end
 end
 
+end
+
+
+% -----------------------     Helper functions     -----------------------------
+
+
+function info = read_ds_info(filename, dsname)
+% Return the h5info struct for the selected HDF5 dataset, or [] if not found
+%   info = read_ds_info(filename, dsname)
+try
+    info = h5info(filename, dsname);
+catch mexc
+    if strcmp(mexc.identifier,'MATLAB:imagesci:h5info:unableToFind')
+        info = [];
+    else
+        rethrow(mexc);
+    end
+end
 end
