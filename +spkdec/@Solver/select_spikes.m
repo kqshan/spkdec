@@ -26,6 +26,10 @@ new_t = gather(new_t);
 % Remove any spikes that violate the refractory period
 refrac_dt = round(R * self.det_refrac);
 if (refrac_dt > 0) && (old_spk.N > 0)
+    % Filter out multiple peaks within a refractory period
+    mask = spkdec.Math.is_reg_max(new_t, delta, refrac_dt);
+    new_t = new_t(mask);
+    assert(all(diff(new_t) > refrac_dt));
     % Determine which local maxima lie within the refractory period
     old_t = [old_spk.r + R*(old_spk.t-1); Inf];
     [~,last_old_spk_lt_t1] = histc(new_t-refrac_dt-0.5, old_t);
