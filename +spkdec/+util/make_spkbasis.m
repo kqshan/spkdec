@@ -8,8 +8,8 @@ function basis = make_spkbasis(src, whitener, varargin)
 %   src         [Inf x C] DataSrc object to read raw data from
 %   whitener    Whitener object for measuring approximation error
 % Optional parameters (key/value pairs) [default]:
-%   solver      Solver object for spike detection               [ auto ]
-%   optimizer   SpikeOptimizer object for basis fitting         [ auto ]
+%   solver      Solver object or params for construction        [ auto ]
+%   optimizer   SpikeOptimizer or params for construction       [ auto ]
 %   n_iter      Number of gradient descent iterations           [ 12 ]
 %   make_ind    Rotate basis so features are independent        [ true ]
 %   K           Number of spike basis waveforms per channel     [ 3 ]
@@ -29,9 +29,9 @@ function basis = make_spkbasis(src, whitener, varargin)
 
 % Optional parameters
 ip = inputParser();
-isemptyora = @(x,class) isempty(x) || isa(x,class);
-ip.addParameter('solver',     [], @(x) isemptyora('spkdec.Solver'));
-ip.addParameter('optimizer',  [], @(x) isemptyora('spkdec.SpikeOptimizer'));
+is_s_ora = @(x,class) isstruct(x) || isa(x,class);
+ip.addParameter('solver',    struct(), @(x) is_s_ora(x,'spkdec.Solver'));
+ip.addParameter('optimizer', struct(), @(x) is_s_ora(x,'spkdec.SpikeOptimizer'));
 ip.addParameter('n_iter',     12, @isscalar);
 ip.addParameter('make_ind', true, @isscalar);
 ip.addParameter('K',  3, @isscalar);
@@ -46,17 +46,16 @@ prm = ip.Results;
 
 % Default optimizer
 optimizer = prm.optimizer;
-if isempty(optimizer)
+if isstruct(optimizer)
     interp = spkdec.Interpolator.make_interp(prm.L, prm.R);
-    whbasis = spkdec.WhitenerBasis(whitener, 'interp',interp);
-    optimizer = spkdec.SpikeOptimizer(whbasis);
+    optimizer = spkdec.SpikeOptimizer(whitener, 'interp',interp, optimizer);
 end
 
 % Default solver
 solver = prm.solver;
-if isempty(solver)
+if isstruct(solver)
     L = optimizer.L;
-    solver = spkdec.Solver('det_refrac',ceil(L/2));
+    solver = spkdec.Solver('det_refrac',ceil(L/2), solver);
 end
 
 % Verbose start
