@@ -94,7 +94,7 @@ properties
     verbose
 end
 
-properties (Access=private)
+properties (Constant, Hidden)
     errid_arg = 'spkdec:SpikeOptiimzer:BadArg';
     errid_dim = 'spkdec:SpikeOptimizer:DimMismatch';
 end
@@ -106,34 +106,40 @@ end
 
 
 methods
-    function obj = SpikeOptimizer(varargin)
+    function obj = SpikeOptimizer(whbasis, varargin)
         % SpikeOptimizer constructor
-        %   obj = SpikeOptimizer([whbasis,] ...)
+        %   obj = SpikeOptimizer(whbasis, ...)
+        %   obj = SpikeOptimizer(whitener, ...)
         %
-        % Optional arguments [default]:
-        %   whbasis   WhiteningBasis object                 [ none ]
+        % Required arguments
+        %   whbasis   WhitenerBasis object (specifies both whitener and interp)
+        % --- or ---
+        %   whitener  Whitener object (interp must be provided as param below)
+        %
         % Optional parameters (key/value pairs) [default]:
-        %   L         Waveform length (#samples)            [defer to whbasis]
-        %   dt_search Spike timing error to search over     [ 1 ]
-        %   n_iter    Number of iterations in optimization  [ 100 ]
-        %   verbose   Print status updates to stdout        [ false ]
-        %
-        % If whbasis is not provided, then the 'L' param must be specified.
+        %   interp    Interpolator object                       [ none ]
+        %   dt_search Spike timing error to search over         [ 1 ]
+        %   n_iter    Number of iterations in optimization      [ 100 ]
+        %   verbose   Print status updates to stdout            [ false ]
+        errid_arg = spkdec.SpikeOptimizer.errid_arg;
+        % Parse the additional arguments
         ip = inputParser();
-        ip.addOptional('whbasis', [], @(x) isa(x,'spkdec.WhitenerBasis'));
-        ip.addParameter('L', [], @(x) isempty(x) || isscalar(x));
+        ip.addParameter('interp', [], ...
+            @(x) isempty(x) || isa(x,'spkdec.Interpolator'));
         ip.addParameter('dt_search', 1, @isscalar);
         ip.addParameter('n_iter', 100, @isscalar);
         ip.addParameter('verbose', false, @isscalar);
         ip.parse( varargin{:} );
         prm = ip.Results;
-        % Construct the whitening basis
-        whbasis = prm.whbasis;
-        if isempty(whbasis)
-            assert(~isempty(prm.L), obj.errid_arg, ...
-                'Either whbasis or the "L" param must be specified');
-            whbasis = spkdec.WhiteningBasis('L',prm.L);
+        % Construct the WhitenerBasis
+        if isa(whbasis,'spkdec.Whitener')
+            interp = prm.interp;
+            assert(~isempty(interp), errid_arg, ['If the first argument ' ...
+                'is a Whitener object, then <interp> must be provided']);
+            whbasis = spkdec.WhitenerBasis(whbasis, 'interp',interp);
         end
+        assert(isa(whbasis,'spkdec.WhitenerBasis'), errid_arg, ...
+            'The first argument must be a WhitenerBasis or a Whitener object');
         % Assign properties
         obj.whbasis = whbasis;
         for fn = {'dt_search','n_iter','verbose'}
