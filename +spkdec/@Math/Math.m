@@ -6,6 +6,7 @@
 %   is_reg_max      - Determine which peaks are a regional maximum
 %   typeconv        - Convert a datatype based on some flags
 %   typecheck       - Check whether the datatype matches the given flags
+%   has_gpu         - Determine whether this machine has a GPU avaliable
 %
 % Other methods (Static):
 %   buildMex        - Compile the MEX files for these routines
@@ -22,6 +23,7 @@ methods (Static)
     mask = is_reg_max(t, x, r);
     x = typeconv(x, flags);
     tf = typecheck(x, flags);
+    tf = has_gpu(varargin);
 
     % MEX management
     buildMex(varargin);
