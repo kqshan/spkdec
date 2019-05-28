@@ -21,6 +21,7 @@ beta = A.K * A.C * self.det_thresh;
 self.consts_init(A,b,beta); % Populate cache of problem-specific constants
 self.verbose_init();        % Start the verbose output
 spk = spkdec.Spikes();      % Start with no spikes detected
+spk.setFeat(zeros(A.K*A.C, 0, 'like',b));
 resid = self.b;             % No spikes ==> residual is same as given data
 
 % Perform the first round of spike detection
