@@ -14,6 +14,7 @@ function y = conv(self, x, varargin)
 assert(K==self.K && C==self.C, self.errid_dim, 'x must be [T x K x C]');
 ovlp = self.L - 1;
 N_auto = max(1024, pow2(2+nextpow2(ovlp+1)));
+output_real = isreal(x) && isreal(self.kernels);
 
 % Optional parameters
 ip = inputParser();
@@ -33,9 +34,8 @@ y = reshape(y, [N B K C]);
 %   Perform the convolution in frequency domain
 y = fft(y, N, 1);
 y = self.conv_hat(y, kern_hat);
-y = ifft(y, N, 1);
-%   Enforce realness
-if isreal(x) && isreal(self.kernels), y = real(y); end
+if output_real, sym_flag='symmetric'; else, sym_flag = 'nonsymmetric'; end
+y = ifft(y, N, 1, sym_flag);
 %   Overlap-add and convert back into a vector
 y = self.batch_to_vec(y, T+ovlp, ovlp, true);
 
