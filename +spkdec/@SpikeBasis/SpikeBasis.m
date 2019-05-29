@@ -242,6 +242,9 @@ properties (Access=protected)
     % output of get_gram_chol() and used in getDelta() and spkNorms()
     H_0
     
+    % [K*C x K*C x R] inverses of H_0
+    H_0_inv
+    
     % WhitenerBasis object, output of toWhBasis()
     whbasis
 end
@@ -262,6 +265,21 @@ methods (Access=protected)
             H0(:,:,r) = chol(gram.getGram(0,r,r), 'upper');
         end
         self.H_0 = H0;
+    end
+    
+    function H0inv = get_gram_chol_inv(self)
+        % Return the inverse of the H_0 matrices returned by get_gram_chol()
+        %   H0inv = get_gram_chol_inv(self)
+        %
+        % Returns:
+        %   H0inv   [K*C x K*C x R] inverses of self.get_gram_chol()
+        H0inv = self.H_0_inv;
+        if ~isempty(H0inv), return; end
+        H0inv = self.get_gram_chol();
+        for r = 1:size(H0inv,3)
+            H0inv(:,:,r) = inv(H0inv(:,:,r));
+        end
+        self.H_0_inv = H0inv;
     end
 end
 

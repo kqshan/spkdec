@@ -40,7 +40,7 @@ assert(K==self.K && R==self.R && C==self.C, self.errid_dim, ...
 % and we won't be able to compute its convolution as efficiently.
 
 % Compute each sub-sample shift index separately
-H_0 = self.get_gram_chol();
+H0_inv = self.get_gram_chol_inv();
 delta = zeros(R, T, 'like',convT_y);
 for r = 1:R
     % Extract and reshape the relevant data
@@ -49,8 +49,9 @@ for r = 1:R
     % Solve for H*x = H'\Aty
     % Except a bunch of things are transposed, and se we actually want
     %   Hx = (H*x).' = (H' \ Aty_r.').' = Aty_r / conj(H)
-    H = H_0(:,:,r);
-    Hx = Aty_r / conj(H);               % [T x K*C]
+    % Also, gpuArray TRSV is way slower than GEMM, and this H is usually
+    % decently well-conditioned, so we'll use the explicit inverse.
+    Hx = Aty_r * conj(H0_inv(:,:,r));   % [T x K*C]
     % Evaluate its norm
     delta(r,:) = sum(abs(Hx).^2, 2)';
 end
