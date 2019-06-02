@@ -48,18 +48,24 @@ methods
         errid_arg = spkdec.DataSrc.errid_arg;
         % Determining the number of dimensions is actually kinda tricky
         shape = size(data);
+        ndims_data = length(shape);
         if nargin < 3
-            ndims = length(shape);
+            ndims = ndims_data;
             % Special case for column vectors
             if ndims==2 && shape(2)==1 && ext_dim==1
                 ndims = 1;
                 shape = shape(1);
             end
-        else
+        elseif ndims > ndims_data
             % Add trailing singleton dimensions if necessary
-            assert(ndims >= length(shape), errid_arg, ...
-                'ndims must be >= length(size(data))');
-            shape = [shape, ones(1,ndims-length(shape))];
+            shape = [shape, ones(1,ndims-ndims_data)];
+        elseif ndims < ndims_data
+            % This is generally not okay, but column vectors are a special case
+            if (ndims==1) && (ndims_data==2) && (shape(2)==1)
+                shape = shape(1);
+            else
+                error(errid, 'ndims must be >= length(size(data))');
+            end
         end
         assert(ext_dim <= ndims, errid_arg, 'ext_dim must be <= ndims');
         % Call the superclass constructor
