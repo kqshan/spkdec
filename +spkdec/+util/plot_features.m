@@ -32,6 +32,9 @@ img_R = prm.upsample;
 feat_range = prm.range;
 if isempty(feat_range)
     feat_range = quantile(spk_X, [.001, .999], 2);
+    feat_range = feat_range * [1.5,-0.5; -0.5,1.5];
+    feat_range(:,1) = max(feat_range(:,1), min(spk_X,[],2));
+    feat_range(:,2) = min(feat_range(:,2), max(spk_X,[],2));
 end
 
 % Count the number of spikes in each upsampled bin
