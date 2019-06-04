@@ -26,6 +26,7 @@ function [outputs, sinks] = make_detection_outputs(basis, varargin)
 %     dataset     [K*C x N] DataSink
 %     scaling     Scaling coefficient to apply when reading this dataset
 %     basis       [L x K x C] spike basis waveforms
+%     t0          Basis sample index (1..L) corresponding to t=0
 %   index       Spike source index (1..T) where detected
 %     dataset     [N] DataSink
 %   subidx      Spike sub-sample shift index (1..R)
@@ -173,6 +174,7 @@ outputs.resid = spkdec.io.ResidSink( basis.toWhBasis(), ...
 
 % Add them to the <sinks> struct
 sinks.feature.basis = basis.basis;
+sinks.feature.t0 = basis.t0;
 sinks.subidx.R = basis.R;
 sinks.subidx.subshift = basis.interp.shifts;
 sinks.whitener = basis.whitener.saveobj();
