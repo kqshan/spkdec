@@ -3,15 +3,17 @@ function spikes = reconst(self, spk, varargin)
 %   spikes = reconst(self, spk, ...)
 %
 % Returns:
-%   spikes      [L+W-1 x C x N] whitened spike waveforms
+%   spikes      [L+W-1 x C x N] whitened (or [L x C x N] non-whitened) waveforms
 % Required arguments:
 %   spk         Detected spike times and features (Spikes object)
 % Optional parameters (key/value pairs) [default]:
 %   subshift    Apply the sub-sample shift indicated by spk.r       [ true ]
+%   whitened    Apply the whitener specified by this basis          [ true ]
 
 % Optional parameters
 ip = inputParser();
 ip.addParameter('subshift', true, @isscalar);
+ip.addParameter('whitened', true, @isscalar);
 ip.parse( varargin{:} );
 prm = ip.Results;
 
@@ -41,8 +43,10 @@ if prm.subshift
 end
 
 % Whiten
-spikes = reshape(spikes, [L*C, N]);                         % [L*C x N]
-spikes = self.whitener.toMat(L, 'flatten',true) * spikes;   % [Lw*C x N]
-spikes = reshape(spikes, [Lw, C, N]);                       % [Lw x C x N]
+if prm.whitened
+    spikes = reshape(spikes, [L*C, N]);                         % [L*C x N]
+    spikes = self.whitener.toMat(L, 'flatten',true) * spikes;   % [Lw*C x N]
+    spikes = reshape(spikes, [Lw, C, N]);                       % [Lw x C x N]
+end
 
 end
