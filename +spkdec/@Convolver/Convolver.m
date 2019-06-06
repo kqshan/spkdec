@@ -16,6 +16,7 @@
 % Convolution
 %   conv        - Perform the forward convolution
 %   convT       - Perform the transpose convolution
+%   conv_batch  - Perform the forward convolution on short batches of data
 % Object management
 %   copy        - Create a copy of this handle object
 %   saveobj     - Serialize a Convolver object to a struct
@@ -107,6 +108,7 @@ methods
     % Convolution
     y = conv(self, x, varargin);
     x = convT(self, y, varargin);
+    y = conv_batch(self, x);
     
     % Representation in a different form
     mat = toKern(self, varargin);

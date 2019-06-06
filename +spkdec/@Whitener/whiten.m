@@ -3,9 +3,9 @@ function y = whiten(self, x, varargin)
 %   y = whiten(self, x, ...)
 %
 % Returns:
-%   y       [T_out x C] whitened data
+%   y       [T_out x C] whitened data (or [T_out x C x N])
 % Required arguments:
-%   x       [T x C] input data
+%   x       [T x C] input data (or [T x C x N])
 % Optional parameters (key/value pairs) [default]:
 %   bounds  Boundary condition {trunc,center,keep}      ['trunc']
 %
@@ -31,15 +31,19 @@ else
 end
 
 % Perform the convolution
-[T,C] = size(x);
-y = conv.conv(reshape(x,[T 1 C]));
+[T,C,N] = size(x);
+if (N == 1)
+    y = conv.conv(reshape(x,[T 1 C]));
+else
+    y = conv.conv_batch(reshape(x,[T 1 C N]));
+end
 
 % Truncate as desired
 switch (prm.bounds)
     case 'trunc'
-        y = y(self.W:T, :);
+        y = y(self.W:T, :, :);
     case 'center'
-        y = y(self.delay+(1:T), :);
+        y = y(self.delay+(1:T), :, :);
     case 'keep'
         % Nothing to do
     otherwise

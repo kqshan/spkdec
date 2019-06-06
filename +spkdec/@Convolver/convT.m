@@ -25,6 +25,8 @@ prm = ip.Results;
 
 % Get the kernels in frequency domain
 N = prm.N_fft;
+assert(N >= 2 * self.L, self.errid_arg, ...
+    'N_fft must be >= 2*self.L to ensure correct results from overlap-add');
 kern_hat = self.get_kernels_hat(N);
 
 % Apply the cross-channel transform

@@ -13,10 +13,6 @@ if size(self.kernels_hat,1)==N
     return
 end
 
-% Check the dimension
-assert(N >= 2 * self.L, self.errid_arg, ...
-    'N_fft must be >= 2*self.L to ensure correct results from overlap-add');
-
 % Perform the FFT
 k_hat = fft(self.kernels, N, 1);
 
