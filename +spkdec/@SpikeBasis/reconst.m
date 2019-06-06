@@ -20,7 +20,6 @@ prm = ip.Results;
 % Check some dimensions
 [D,N] = size(spk.X);
 [L,K,C] = size(self.basis);
-Lw = L + self.W - 1;
 assert(D == K*C, self.errid_dim, 'Feature dimensions must match K * C');
 
 % 1. Multiply by the spike basis -----------------------------------------------
@@ -44,9 +43,7 @@ end
 
 % Whiten
 if prm.whitened
-    spikes = reshape(spikes, [L*C, N]);                         % [L*C x N]
-    spikes = self.whitener.toMat(L, 'flatten',true) * spikes;   % [Lw*C x N]
-    spikes = reshape(spikes, [Lw, C, N]);                       % [Lw x C x N]
+    spikes = self.whitener.whiten(spikes, 'bounds',keep);
 end
 
 end
