@@ -43,7 +43,7 @@ end
 
 % Whiten
 if prm.whitened
-    spikes = self.whitener.whiten(spikes, 'bounds',keep);
+    spikes = self.whitener.whiten(spikes, 'bounds','keep');
 end
 
 end
