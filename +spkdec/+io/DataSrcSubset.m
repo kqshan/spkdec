@@ -1,6 +1,6 @@
 % DataSrc subclass that reads a subset of another underlying DataSrc
 %
-% DataSrcSubset properties (read-only)
+% DataSrcSubset properties (read-only):
 % Dimensions
 %   ext_dim   - Extensible dimension (dimension along which data is read)
 %   shape     - Data dimensions, with Inf for the extensible dimension
