@@ -192,7 +192,7 @@ end
 
 methods (Access=protected)
     % Initialization
-    Y = convert_spikes_to_Y(self, spikes);
+    Y = convert_spikes_to_Y(self, spikes, pad);
     A0 = init_spkbasis(self, K);
     
     % Optimize spikes with basis held constant
@@ -221,6 +221,7 @@ properties (Access=protected, Transient)
                 % corresponding to shifts of (-dt_search:dt_search)
     A0          % [L x K x C] whitened previous basis in Q2 basis
     lambda      % Weight applied to the proximal regularizer ||A-A0||
+    spk_r       % User-specified sub-sample shift for each spike
     t_start     % tic() when we started this problem
 end
 

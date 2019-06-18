@@ -12,16 +12,18 @@ function [basis, spk, resid] = optimize(self, data, varargin)
 %   lambda      Proximal regularizer weight                 [ 0 ]
 %   basis_prev  Previous basis (for proximal regularizer)   [ none ]
 %   K           Number of basis waveforms per channel     [defer to basis_prev]
+%   zero_pad    [pre,post] #samples of zero-padding to add  [ 0,0 ]
+%   spk_r       [N x 1] sub-sample shift for each spike     [ auto ]
 %
 % This finds the basis waveforms and spike fetaures to solve:
 %     minimize    ||data - basis*spk.X||^2 + lambda*||basis-basis_prev||^2
 %   subject to    basis is channel-specific and channelwise orthonormal
 % where the norms are defined in terms of the whitened inner product.
 %
-% If self.dt_search > 0 and/or self.whbasis.R > 1, then this process will also
-% search over available full- and/or sub-sample shifts in the detected spike
-% times. This reduces the incentive to represent such shifts using the spike
-% basis itself.
+% If self.dt_search > 0 and/or self.whbasis.R > 1 (unless `spk_r` is given),
+% then this process will also search over available full- and/or sub-sample
+% shifts in the detected spike times. This reduces the incentive to represent
+% such shifts using the spike basis itself.
 
 
 % --------------------     Problem description     ------------------------
@@ -115,11 +117,13 @@ ip = inputParser();
 ip.addParameter('lambda', 0, @isscalar);
 ip.addParameter('basis_prev', []);
 ip.addParameter('K', [], @(x) isempty(x) || isscalar(x));
+ip.addParameter('zero_pad', [0 0], @(x) numel(x)==2);
+ip.addParameter('spk_r', [], @(x) isempty(x) || numel(x)==size(data,3));
 ip.parse( varargin{:} );
 prm = ip.Results;
 
 % Convert the given spikes into Q1 coordinates
-self.Y = self.convert_spikes_to_Y(data);
+self.Y = self.convert_spikes_to_Y(data, prm.zero_pad);
 
 % Get a starting spike basis
 if isempty(prm.basis_prev)
@@ -143,6 +147,13 @@ end
 % Store this (and lambda) in our object-level cache
 self.A0 = A;
 self.lambda = prm.lambda;
+% Also save the user-specified spk_r, if given
+self.spk_r = prm.spk_r(:);
+if ~isempty(self.spk_r) && (self.dt_search > 0)
+    warning('spkdec:SpikeOptimizer:WeirdSearch', ['The sub-sample shift is ' ...
+        'fixed by the user-specified spk_r,\nbut we are still searching '...
+        'over full-sample shifts since dt_search > 0. This is kinda weird']);
+end
 
 % Start the verbose output
 self.verbose_init();
@@ -202,6 +213,7 @@ end
 % Cleanup
 self.verbose_cleanup();
 self.lipschitz_cleanup();
+self.spk_r = [];
 self.t_start = []; self.Y = []; self.A0 = []; self.lambda = [];
 
 end

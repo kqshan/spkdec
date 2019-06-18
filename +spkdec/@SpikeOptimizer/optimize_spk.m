@@ -47,17 +47,27 @@ end
 % And to evaluate which is the best shift index, let us compute
 %   delta = ||y||^2 - ||y-A2*x||^2 = ||A2*x||^2 = ||Q'*y||^2
 delta = zeros(N, R, S, 'like',self.Y);
-for s = 1:S
-    for r = 1:R
-        delta(:,r,s) = sum((A2r_Q(:,:,r)' * self.Y(:,:,s)).^2, 1)';
+if (S==1) && (R==1 || ~isempty(self.spk_r))
+    % Our choice of shift index is fully constrained, no need to compute delta
+else
+    % Compute delta for each (r,s)
+    for s = 1:S
+        for r = 1:R
+            delta(:,r,s) = sum((A2r_Q(:,:,r)' * self.Y(:,:,s)).^2, 1)';
+        end
     end
 end
 
 % Find the optimal (s,r) for each spike
-[~,spk_rs] = max(reshape(delta,[N, S*R]), [], 2);
+[~,spk_rs] = max(reshape(delta,[N, R*S]), [], 2);
 spk_rs = gather(spk_rs);
 spk_s = ceil(spk_rs/R);
 spk_r = spk_rs - R*(spk_s-1);
+
+% Overwrite spk_r if desired
+if ~isempty(self.spk_r)
+    spk_r = self.spk_r;
+end
 
 % 2. Solve for X and compute the additional quantities -------------------------
 
