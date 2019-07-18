@@ -75,11 +75,11 @@ properties (SetAccess=protected)
     % Method used to perform these decompositions (string)
     %
     % The options are:
-    %   qr  - QR decomposition: wh_01 will be upper triangular and map_02 will
+    %   qr  - QR decomposition: wh_01 will be upper triangular and wh_02 will
     %         be block diagonal with upper triangular blocks
     %   svd - Singular value decomposition: wh_01 will have orthogonal rows 
     %         (wh_01*wh_01' is diagonal and sorted in decreasing order) and 
-    %         likewise for the blocks of map_02
+    %         likewise for the blocks of wh_02
     method
     
     % Maximum condition number (imposed when inverting matrices)
