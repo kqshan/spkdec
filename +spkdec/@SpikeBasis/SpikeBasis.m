@@ -4,6 +4,7 @@
 % Dimensions
 %   C           - Number of data channels
 %   K           - Number of spike basis waveforms per channel
+%   D           - Number of spike basis waveforms overall
 %   L           - Basis waveform length (#samples) before whitening
 %   W           - Frequency-whitening filter length (#samples)
 %   V           - Overall overlap length (#samples), V = L-1 + W-1
@@ -52,7 +53,11 @@ properties (SetAccess=private, Dependent)
     
     % Number of spike basis waveforms per channel
     % The total number of kernels is K*C
+    % See also: spkdec.SpikeBasis.D
     K
+    
+    % Number of spike basis waveforms overall
+    D
     
     % Basis waveform length (#samples) before whitening
     % All basis waveforms have the same length.
@@ -70,6 +75,7 @@ end
 methods
     function val = get.C(self), val = size(self.basis,3);  end
     function val = get.K(self), val = size(self.basis,2);  end
+    function val = get.D(self), val = self.K * self.C;     end
     function val = get.L(self), val = size(self.basis,1);  end
     function val = get.W(self), val = self.whitener.W;     end
     function val = get.V(self), val = self.L-1 + self.W-1; end
@@ -238,11 +244,11 @@ properties (Access=protected)
     % Gramians object, output of toGram() and used in solve()
     gramians
     
-    % [K*C x K*C x R] upper Cholesky decompositions of lag 0 Gram matrices,
+    % [D x D x R] upper Cholesky decompositions of lag 0 Gram matrices,
     % output of get_gram_chol() and used in getDelta() and spkNorms()
     H_0
     
-    % [K*C x K*C x R] inverses of H_0
+    % [D x D x R] inverses of H_0
     H_0_inv
     
     % WhitenerBasis object, output of toWhBasis()
@@ -255,7 +261,7 @@ methods (Access=protected)
         %   H_0 = get_gram_chol(self)
         %
         % Returns:
-        %   H_0     [K*C x K*C x R] upper Cholesky decompositions
+        %   H_0     [D x D x R] upper Cholesky decompositions
         %           of self.toGram().getGram(0,r,r)
         H0 = self.H_0;
         if ~isempty(H0), return; end
@@ -272,7 +278,7 @@ methods (Access=protected)
         %   H0inv = get_gram_chol_inv(self)
         %
         % Returns:
-        %   H0inv   [K*C x K*C x R] inverses of self.get_gram_chol()
+        %   H0inv   [D x D x R] inverses of self.get_gram_chol()
         H0inv = self.H_0_inv;
         if ~isempty(H0inv), return; end
         H0inv = self.get_gram_chol();

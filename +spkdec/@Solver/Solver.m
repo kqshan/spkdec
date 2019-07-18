@@ -1,7 +1,7 @@
 % Greedy solver (orthogonal matching pursuit) for sparse deconvolution problems
 %
 % Solver properties:
-%   det_thresh  - Spike detection threshold (relative to K*C)
+%   det_thresh  - Spike detection threshold (relative to D)
 %   det_refrac  - Refractory period (#samples) for spike detection
 %   coh_thresh  - Mutual coherence threshold used within an OMP iteration
 %   gram_thresh - Threshold to consider a Gram matrix negligible
@@ -24,7 +24,7 @@ classdef Solver < matlab.mixin.Copyable
 
 
 properties
-    % Spike detection threshold (relative to K*C)
+    % Spike detection threshold (relative to the number of basis dimensions D)
     %
     % The solve() method seeks to minimize ||A*x-b||^2 + beta*nnz_cols(x), where
     % A is the convolutional spike basis, x is the column-sparse matrix of spike
@@ -35,9 +35,9 @@ properties
     % improve our squared reconstruction error by more than <beta>. If
     % det_refrac == 0, then this also guarantees that ||A'*residual|| < beta.
     %
-    % beta = K*C * det_thresh. This alternative parameterization is useful
+    % beta = D * det_thresh. This alternative parameterization is useful
     % because ||A'*z||, where z is taken from a standard multivariate normal
-    % distribution, is chi-squared distributed with K*C degrees of freedom, so
+    % distribution, is chi-squared distributed with D degrees of freedom, so
     % this can be a more convenient way to think about false positive rates.
     % Default = 10
     det_thresh = 10;

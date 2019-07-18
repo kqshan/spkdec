@@ -59,7 +59,7 @@ properties
     % [N] residual norm in attainable subspace
     %
     % This stores the norm of the residual, i.e. how much of the observed data
-    % is left unaccounted for by our K*C-dimensional sparse-deconvolution-based
+    % is left unaccounted for by our D-dimensional sparse-deconvolution-based
     % approximation of the source data.
     %
     % When combined with the spike norm (see SpikeBasis.spkNorms), this can be

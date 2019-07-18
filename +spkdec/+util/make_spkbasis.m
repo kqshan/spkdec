@@ -91,12 +91,12 @@ for K = 2:prm.K
     % Adjust the spike detection threshold because the K is different
     % We'll set it so to maintain a constant false positive rate (under a
     % chi-squared distribution, an assumption that is definitely wrong).
-    KC_tgt = prm.K * basis.C;
+    D_tgt = prm.K * basis.C;
     det_thresh_tgt = solver.det_thresh;
-    log_ccdf_tgt = log(chi2cdf(KC_tgt*det_thresh_tgt, KC_tgt, 'upper'));
-    KC_curr = K * basis.C;
+    log_ccdf_tgt = log(chi2cdf(D_tgt*det_thresh_tgt, D_tgt, 'upper'));
+    D_curr = K * basis.C;
     det_thresh = fzero(@(x) ...
-        log(chi2cdf(KC_curr*x,KC_curr,'upper')) - log_ccdf_tgt, det_thresh_tgt);
+        log(chi2cdf(D_curr*x,D_curr,'upper')) - log_ccdf_tgt, det_thresh_tgt);
     solver2 = copy(solver);
     solver2.det_thresh = det_thresh;
     % Perform the update

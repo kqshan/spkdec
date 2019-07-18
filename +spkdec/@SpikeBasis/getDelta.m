@@ -9,8 +9,8 @@ function delta = getDelta(self, convT_y)
 %   convT_y   [T x K x R x C] output of self.convT(y)
 
 % Dimensions
-[T, K, R, C] = size(convT_y);
-assert(K==self.K && R==self.R && C==self.C, self.errid_dim, ...
+[T, K, R, C] = size(convT_y); D = K*C;
+assert(D==self.D && R==self.R && C==self.C, self.errid_dim, ...
     'y must be [T x K x R x C]');
 
 % The nice thing about minimizing the squared error is that if
@@ -24,8 +24,8 @@ assert(K==self.K && R==self.R && C==self.C, self.errid_dim, ...
 
 % So now let's consider solving for x. This is simply a least-squares problem:
 %   x = inv(A'*A) * (A'*y)
-% We're looking at a single time step, so A is a [(L+W-1)*C x K*C] matrix. Since
-% L+W-1 >> K, it can be convenient to come up with a square matrix H such that
+% We're looking at a single time step, so A is a [(L+W-1)*C x D] matrix. Since
+% (L+W-1)*C >> D, it's convenient to come up with a square matrix H such that
 %   H'*H == A'*A
 % so that we can write
 %   x = inv(H'*H) * (A'*y)
@@ -45,13 +45,13 @@ delta = zeros(R, T, 'like',convT_y);
 for r = 1:R
     % Extract and reshape the relevant data
     Aty_r = convT_y(:,:,r,:);           % [T x K x 1 x C]
-    Aty_r = reshape(Aty_r, [T, K*C]);   % [T x K*C]
+    Aty_r = reshape(Aty_r, [T D]);      % [T x D]
     % Solve for H*x = H'\Aty
     % Except a bunch of things are transposed, and se we actually want
     %   Hx = (H*x).' = (H' \ Aty_r.').' = Aty_r / conj(H)
     % Also, gpuArray TRSV is way slower than GEMM, and this H is usually
     % decently well-conditioned, so we'll use the explicit inverse.
-    Hx = Aty_r * conj(H0_inv(:,:,r));   % [T x K*C]
+    Hx = Aty_r * conj(H0_inv(:,:,r));   % [T x D]
     % Evaluate its norm
     delta(r,:) = sum(abs(Hx).^2, 2)';
 end

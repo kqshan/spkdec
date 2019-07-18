@@ -23,7 +23,7 @@ function [outputs, sinks] = make_detection_outputs(basis, varargin)
 %   
 % The <sinks> struct is a nested struct that emulates the HDF5 file structure:
 %   feature     Spike features
-%     dataset     [K*C x N] DataSink
+%     dataset     [D x N] DataSink
 %     scaling     Scaling coefficient to apply when reading this dataset
 %     basis       [L x K x C] spike basis waveforms
 %     t0          Basis sample index (1..L) corresponding to t=0
@@ -46,7 +46,7 @@ function [outputs, sinks] = make_detection_outputs(basis, varargin)
 %     delay       Whitening filter delay (#samples)
 %   detparams   Detection parameters (only if det_thresh,det_refrac are given)
 %     thresh      Detection threshold (see spkdec.Solver.det_thresh)
-%     norm        Minimum detectable spknorm, equal to sqrt(K*C*det_thresh)
+%     norm        Minimum detectable spknorm, equal to sqrt(D*det_thresh)
 %     refrac      Detection refractory period (#samples)
 %
 % If you call this with <file>=[], then after running util.detect_spikes(), you
@@ -101,7 +101,7 @@ h5_prm = struct('chunk_size',prm.chunk_size, ...
 %% Construct the <outputs> struct
 
 % Get some dimensions
-D = basis.K * basis.C;
+D = basis.D;
 C = basis.C;
 L = basis.L;
 % Create the underlying data sinks
@@ -195,7 +195,7 @@ end
 if ~isempty(filename)
     copy_struct_to_h5(sinks, filename, '/')
 end
-    
+
 
 end
 

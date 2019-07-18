@@ -3,7 +3,7 @@ function spk_X = find_spike_features(self, spk)
 %   spk_X = find_spike_features(self, spk)
 %
 % Returns:
-%   spk_X   [K*C x N] optimal spikes in feature space
+%   spk_X   [D x N] optimal spikes in feature space
 % Required arguments:
 %   spk     Spike times (Spikes object)
 

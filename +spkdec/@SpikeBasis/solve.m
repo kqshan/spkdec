@@ -3,7 +3,7 @@ function spk_X = solve(self, convT_y, spk_t, spk_r, varargin)
 %   spk_X = solve(self, convT_y, spk_t, spk_r, ...)
 %
 % Returns:
-%   spk_X     [K*C x N] optimal spike features
+%   spk_X     [D x N] optimal spike features
 % Required arguments:
 %   convT_y   [T x K x R x C] output of self.convT(y)
 %   spk_t     [N x 1] spike times (1..T)
@@ -17,7 +17,7 @@ function spk_X = solve(self, convT_y, spk_t, spk_r, varargin)
 % See also: spkdec.Gramians.getGramSeq
 
 % Dimensions
-[T, K, R, C] = size(convT_y);
+[T, K, R, C] = size(convT_y); D = K*C;
 N = numel(spk_t);
 assert(numel(spk_r)==N, self.errid_dim, ...
     'spk_t and spk_r must be the same length');
@@ -57,6 +57,6 @@ AtA_bands = self.toGram().getGramSeq(spk_t, spk_r, 'thresh',prm.thresh);
 spk_X = spkdec.Math.pbsolve(AtA_bands, Aty(:));
 
 % Reshape into the desired shape
-spk_X = reshape(spk_X, [K*C, N]);
+spk_X = reshape(spk_X, [D N]);
 
 end

@@ -9,10 +9,10 @@ if self.verbose
     self.last_err = gather(double(err));
     self.last_nnz = 0;
     % Print the header
-    [T, K, R, C] = size(self.At_b);
+    T = size(self.At_b,1); C = self.A.C; D = self.A.D; R = self.A.R;
     fprintf('solve() started at %s\n', datestr(now(),31));
-    fprintf('  T=%d, C=%d, K=%d, R=%d, data %.3g rms\n', ...
-        T, C, K, R, sqrt(err/T/C));
+    fprintf('  T=%d, C=%d, D=%d, R=%d, data %.3g rms\n', ...
+        T, C, D, R, sqrt(err/T/C));
 end
 
 % Set up the iteration-level updates

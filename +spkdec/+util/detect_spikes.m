@@ -17,7 +17,7 @@ function detect_spikes(basis, source, outputs, varargin)
 %   vb_period   Verbose update period (sec)                 [ 30 ]
 %
 % The <outputs> argument is a struct where each field is a DataSink object:
-%   feature     [D x N] spike features (D = basis.K*basis.C)
+%   feature     [D x N] spike features
 %   index       [N] spike times (1..source.T) for spike center (basis.t0)
 %   subidx      [N] sub-sample shift index (1..basis.R)
 %   spknorm     [N] spike norm (in whitened space)
@@ -74,7 +74,7 @@ end
 
 % Dimensions and other local variables
 C = basis.C;    % Number of channels
-D = basis.K*C;  % Number of feature space dimensions
+D = basis.D;    % Number of feature space dimensions
 L = basis.L;    % Waveform length (non-whitened)
 W = basis.W;    % Whitening filter length
 Lw = L + W-1;   % Waveform length (whitened)

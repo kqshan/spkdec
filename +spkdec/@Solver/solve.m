@@ -11,17 +11,17 @@ function [spk, resid] = solve(self, A, b)
 %
 % This uses orthogonal matching pursuit to solve the optimization problem
 %   minimize  ||b - A.conv(spk)||^2 + beta*spk.N
-% where beta = A.K * A.C * self.det_thresh.
+% where beta = A.D * self.det_thresh.
 %
 % The detected spike times are based on a purely causal convolution, so spk.t
 % corresponds to the start of the whitened waveform.
 
 % Initialize the loop
-beta = A.K * A.C * self.det_thresh;
+beta = A.D * self.det_thresh;
 self.consts_init(A,b,beta); % Populate cache of problem-specific constants
 self.verbose_init();        % Start the verbose output
 spk = spkdec.Spikes();      % Start with no spikes detected
-spk.setFeat(zeros(A.K*A.C, 0, 'like',b));
+spk.setFeat(zeros(A.D, 0, 'like',b));
 resid = self.b;             % No spikes ==> residual is same as given data
 
 % Perform the first round of spike detection

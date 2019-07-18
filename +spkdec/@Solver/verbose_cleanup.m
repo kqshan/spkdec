@@ -18,7 +18,7 @@ if self.verbose
         err = norm(resid,'fro').^2;
         nnz = spk.N;
     end
-    [T, ~, ~, C] = size(self.At_b);
+    T = size(self.At_b,1); C = self.A.C;
     % Print
     fprintf('  Completed in %d iter at %s (%.1f sec elapsed)\n', ...
         n_iter, datestr(now(),31), toc(self.t_start));

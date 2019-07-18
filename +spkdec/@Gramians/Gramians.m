@@ -34,7 +34,6 @@ properties (SetAccess=private, Dependent)
     C
     
     % Number of kernels per family
-    % If comparing this to classes like SpikeBasis or Convolver, then D = K*C
     D
     
     % Number of kernel families
