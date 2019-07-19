@@ -6,12 +6,11 @@ function delta = getDelta(self, convT_y)
 %   delta     [R x T] improvement in squared error from adding a spike at each
 %             (sub-sample shift index, time index)
 % Required argumens:
-%   convT_y   [T x K x R x C] output of self.convT(y)
+%   convT_y   [T x D x R] output of self.convT(y)
 
 % Dimensions
-[T, K, R, C] = size(convT_y); D = K*C;
-assert(D==self.D && R==self.R && C==self.C, self.errid_dim, ...
-    'y must be [T x K x R x C]');
+[T, D, R] = size(convT_y);
+assert(D==self.D && R==self.R, self.errid_dim, 'y must be [T x D x R]');
 
 % The nice thing about minimizing the squared error is that if
 %   x = argmin ||y - A*x||
@@ -43,9 +42,8 @@ assert(D==self.D && R==self.R && C==self.C, self.errid_dim, ...
 H0_inv = self.get_gram_chol_inv();
 delta = zeros(R, T, 'like',convT_y);
 for r = 1:R
-    % Extract and reshape the relevant data
-    Aty_r = convT_y(:,:,r,:);           % [T x K x 1 x C]
-    Aty_r = reshape(Aty_r, [T D]);      % [T x D]
+    % Extract the relevant data
+    Aty_r = convT_y(:,:,r);             % [T x D]
     % Solve for H*x = H'\Aty
     % Except a bunch of things are transposed, and se we actually want
     %   Hx = (H*x).' = (H' \ Aty_r.').' = Aty_r / conj(H)

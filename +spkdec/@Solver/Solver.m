@@ -153,7 +153,7 @@ end
 properties (Access=protected)
     A           % Kernels for convolution (SpikeBasis object)
     b           % [T+V x C] Whitened data
-    At_b        % [T x K x R x C] output of A.convT(b)
+    At_b        % [T x D x R] output of A.convT(b)
     beta        % Regularizer cost per spike
     select_dt   % Refractory period for spike selection (based on coh_thresh)
     t_start     % tic() when we started this problem

@@ -5,7 +5,7 @@ function spk_X = solve(self, convT_y, spk_t, spk_r, varargin)
 % Returns:
 %   spk_X     [D x N] optimal spike features
 % Required arguments:
-%   convT_y   [T x K x R x C] output of self.convT(y)
+%   convT_y   [T x D x R] output of self.convT(y)
 %   spk_t     [N x 1] spike times (1..T)
 %   spk_r     [N x 1] spike sub-sample shift index (1..R)
 % Optional parameters (key/value pairs) [default]:
@@ -17,10 +17,11 @@ function spk_X = solve(self, convT_y, spk_t, spk_r, varargin)
 % See also: spkdec.Gramians.getGramSeq
 
 % Dimensions
-[T, K, R, C] = size(convT_y); D = K*C;
+[T, D, R] = size(convT_y);
 N = numel(spk_t);
 assert(numel(spk_r)==N, self.errid_dim, ...
     'spk_t and spk_r must be the same length');
+assert(max(spk_r) <= R, self.errid_arg, 'spk_r must be <= R');
 % Make them column vectors
 spk_t = spk_t(:);
 spk_r = spk_r(:);
@@ -45,10 +46,10 @@ prm = ip.Results;
 
 % A'*y
 % This is just an array indexing problem
-tr = spk_t + T*K*(spk_r-1);         % [N x 1] index
-kc = T*(0:K-1)' + T*K*R*(0:C-1);    % [K x C] offset
-kctr = kc(:) + tr';                 % [K*C x N] index
-Aty = convT_y(kctr);
+tr = spk_t + T*D*(spk_r-1);         % [N x 1] index
+d = T*(0:D-1)';                     % [D x 1] offset
+dtr = d + tr';                      % [D x N] index
+Aty = convT_y(dtr);
 
 % A'*A
 AtA_bands = self.toGram().getGramSeq(spk_t, spk_r, 'thresh',prm.thresh);

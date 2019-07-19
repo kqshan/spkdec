@@ -84,6 +84,7 @@ end
 
 properties (SetAccess=protected)
     % [L x K x C] spike basis waveforms (unwhitened)
+    %
     % Basis waveforms are specific to a particular channel. This allows for more
     % efficient convolution and makes the feature space easier to interpret.
     basis

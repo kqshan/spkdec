@@ -5,15 +5,17 @@ function y = conv(self, x)
 % Returns:
 %   y       [T+V x C] convolution output
 % Required arguments:
-%   x       [T x K x R x C] spike features
+%   x       [T x D x R] spike features
 
 % Check dimensions
-[T, K, R, C] = size(x);
-assert(K==self.K && R==self.R && C==self.C, self.errid_dim, ...
-    'x must be a [T x K x R x C] array');
+[T, D, R] = size(x);
+assert(D==self.D && R==self.R, self.errid_dim, 'x must be a [T x D x R] array');
+K = self.K; C = self.C;
 
 % Reshape x to be compatible with our convolver object
-x = reshape(x, [T, K*R*C]);
+x = reshape(x, [T K C R]);      % [T x K x C x R]
+x = permute(x, [1 2 4 3]);      % [T x K x R x C]
+x = reshape(x, [T, K*R*C]);     % [T x K*R*C]
 
 % Perform the convolution
 y = self.toConv().conv(x);

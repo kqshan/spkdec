@@ -15,7 +15,7 @@
 %   shiftTimes  - Shift the spike times by a given offset
 %   addSpikes   - Append new spikes to this collection
 % Data conversion
-%   toFull      - Return a [T x K x R x C] dense representation of the spikes
+%   toFull      - Return a [T x D x R] dense representation of the spikes
 %   subset      - Return a subset of these spikes
 %   concat      - Concatenate a set of Spikes objects
 % Object management
@@ -128,7 +128,7 @@ end
 methods
     function s = saveobj(self)
         s = struct();
-        for fn = {'T','R','t','r','X'}, s.(fn{1}) = self.(fn{1}); end
+        for fn = {'t','r','X'}, s.(fn{1}) = self.(fn{1}); end
     end
 end
 methods (Static)
