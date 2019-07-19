@@ -6,6 +6,9 @@ function k_hat = get_kernels_hat(self, N)
 %   k_hat   [N x K x C] single-channel kernels in DFT domain (as causal kernels)
 % Required arguments:
 %   N       DFT size
+%
+% If N > L, then extra zeros will be added to the end if the kernel, the same as
+% the behavior of fft().
 
 % Look in the cache
 if size(self.kernels_hat,1)==N

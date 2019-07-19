@@ -13,7 +13,7 @@ assert(K==self.K && R==self.R && C==self.C, self.errid_dim, ...
     'x must be a [T x K x R x C] array');
 
 % Reshape x to be compatible with our convolver object
-x = reshape(x, [T, K*R, C]);
+x = reshape(x, [T, K*R*C]);
 
 % Perform the convolution
 y = self.toConv().conv(x);

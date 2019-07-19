@@ -31,11 +31,11 @@ else
 end
 
 % Perform the convolution
-[T,C,N] = size(x);
+[T,C,N] = size(x); %#ok<ASGLU>
 if (N == 1)
-    y = conv.conv(reshape(x,[T 1 C]));
+    y = conv.conv(x);
 else
-    y = conv.conv_batch(reshape(x,[T 1 C N]));
+    y = conv.conv_batch(x);
 end
 
 % Truncate as desired

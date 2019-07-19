@@ -2,8 +2,9 @@
 %
 % Convolver properties (read-only):
 % Dimensions
-%   C           - Number of data channels
+%   C           - Number of data channels (convolution output dimension)
 %   K           - Number of convolution kernels per channel
+%   D           - Number of convolution kernels (convolution input dimension)
 %   L           - Kernel length (#samples)
 % Data
 %   kernels     - [L x K x C] convolution kernels for each channel
@@ -38,6 +39,10 @@ properties (SetAccess=private, Dependent)
     % The total number of kernels is K*C
     K
     
+    % Number of convolution kernels overall
+    % For this class, D = K*C
+    D
+    
     % Kernel length (# of samples)
     % All kernels have the same length and <t0>
     L
@@ -45,15 +50,23 @@ end
 methods
     function val = get.C(self), val = size(self.kernels,3); end
     function val = get.K(self), val = size(self.kernels,2); end
+    function val = get.D(self), val = self.K * self.C;      end
     function val = get.L(self), val = size(self.kernels,1); end
 end
 
 properties (SetAccess=protected)
     % [L x K x C] convolution kernels for each channel
-    % Each of these is restricted to a single channel, as this amkes the
+    %
+    % Each of these is restricted to a single channel, as this makes the
     % convolution faster to perform and is often convenient for interpreting the
     % resulting feature space. The forward convolution involves summing over the
     % K kernels for each channel.
+    %
+    % Why [L x K x C] rather than [L x C x K]? The latter would make the special
+    % case of K==1 easier to deal with, and make subsample interpolation (in
+    % which the subsample-shifted kernels appear as additional kernels) easier
+    % to implement. Alas, this is because this code evolved from single-channel
+    % convolution and it's too much work to go back and change the order now.
     kernels
     
     % [C x C] cross-channel transform
@@ -144,7 +157,7 @@ end
 % Caches
 
 properties (Access=protected)
-    % [L x C x K x C] conv. kernels after the applying cross-channel transform.
+    % [L x C x D] conv. kernels after the applying cross-channel transform.
     % This is used in toMat()
     kernels_full
     

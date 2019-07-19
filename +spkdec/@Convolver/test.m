@@ -102,7 +102,7 @@ if verbose
     fprintf('\n');
     fprintf('  %-16s |     Error/eps\n', '  Dimensions');
     fprintf('  %3s %2s %2s %6s | %6s  %6s\n', ...
-        'L','K','C','T', 'f64','f32' );
+        'L','D','C','T', 'f64','f32' );
     if prm.do_gpu, fprintf('\b  %6s  %6s\n', 'f64gpu', 'f32gpu'); end
 end
 % Try each of these cases
@@ -111,16 +111,17 @@ for ii = 1:prm.nCases
     % Construct the data
     LKC = LKCT(ii,1:3); T = LKCT(ii,4);
     [kernels, wh_ch] = create_random_kernels(LKC);
-    [L,K,C] = size(kernels);
+    [L,K,C] = size(kernels); D = K*C;
     A = spkdec.Convolver(kernels, 'wh_ch',wh_ch);
-    x = randn(T, K, C);
-    if verbose, fprintf('  %3d %2d %2d %6d |',L,K,C,T); end
+    x = randn(T, D);
+    if verbose, fprintf('  %3d %2d %2d %6d |',L,D,C,T); end
     % Compute the reference result
     N_min = 1024; % Otherwise it gets real slow
     y_ref = zeros(T+(L-1),C);
     for c = 1:C
         for k = 1:K
-            y = fftfilt(kernels(:,k,c), [x(:,k,c); zeros(L-1,1)], N_min);
+            d = k + K*(c-1);
+            y = fftfilt(kernels(:,k,c), [x(:,d); zeros(L-1,1)], N_min);
             y_ref(:,c) = y_ref(:,c) + y;
         end
     end
@@ -141,8 +142,8 @@ for ii = 1:prm.nCases
         % Log the error if it exceeds our threshold
         if err > prm.tol*epsilon
             errmsg{end+1} = sprintf(['Excessive error (%.1fx epsilon) in: ' ...
-                'L=%d, K=%d, C=%d, T=%d, use_f32=%d, use_gpu=%d\n'], ...
-                err/epsilon, L,K,C,T, opt.use_f32, opt.use_gpu); %#ok<AGROW>
+                'L=%d, D=%d, C=%d, T=%d, use_f32=%d, use_gpu=%d\n'], ...
+                err/epsilon, L,D,C,T, opt.use_f32, opt.use_gpu); %#ok<AGROW>
         end
     end
     % Go on to the next dimension case
@@ -174,7 +175,7 @@ if verbose
     fprintf('\n');
     fprintf('  %-16s |     Error/eps\n', '  Dimensions');
     fprintf('  %3s %2s %2s %6s | %6s  %6s\n', ...
-        'L','K','C','T', 'f64','f32' );
+        'L','D','C','T', 'f64','f32' );
     if prm.do_gpu, fprintf('\b  %6s  %6s\n', 'f64gpu', 'f32gpu'); end
 end
 % Try each of these cases
@@ -183,18 +184,19 @@ for ii = 1:prm.nCases
     % Construct the data
     LKC = LKCT(ii,1:3); T = LKCT(ii,4);
     [kernels, wh_ch] = create_random_kernels(LKC);
-    [L,K,C] = size(kernels);
+    [L,K,C] = size(kernels); D = K*C;
     A = spkdec.Convolver(kernels, 'wh_ch',wh_ch);
     y = randn(T+(L-1), C);
-    if verbose, fprintf('  %3d %2d %2d %6d |',L,K,C,T); end
+    if verbose, fprintf('  %3d %2d %2d %6d |',L,D,C,T); end
     % Compute the reference result
     N_min = 1024; % Otherwise it gets real slow
     y_wh = (wh_ch' * y.').';
-    x_ref = zeros(T,K,C);
+    x_ref = zeros(T,D);
     for c = 1:C
         for k = 1:K
+            d = k + K*(c-1);
             x = fftfilt(flipud(conj(kernels(:,k,c))), y_wh(:,c), N_min);
-            x_ref(:,k,c) = x(L:end);
+            x_ref(:,d) = x(L:end);
         end
     end
     x_norm = norm(x_ref(:));
@@ -213,8 +215,8 @@ for ii = 1:prm.nCases
         % Log the error if it exceeds our threshold
         if err > prm.tol*epsilon
             errmsg{end+1} = sprintf(['Excessive error (%.1fx epsilon) in: ' ...
-                'L=%d, K=%d, C=%d, T=%d, use_f32=%d, use_gpu=%d\n'], ...
-                err/epsilon, L,K,C,T, opt.use_f32, opt.use_gpu); %#ok<AGROW>
+                'L=%d, D=%d, C=%d, T=%d, use_f32=%d, use_gpu=%d\n'], ...
+                err/epsilon, L,D,C,T, opt.use_f32, opt.use_gpu); %#ok<AGROW>
         end
     end
     % Go on to the next dimension case
@@ -234,14 +236,14 @@ function test_convolution_performance(prm)
 
 % Create the Convolver and example data
 [kernels, wh_ch] = create_random_kernels();
-[L,K,C] = size(kernels);
+[L,K,C] = size(kernels); D = K*C;
 A = spkdec.Convolver(kernels, 'wh_ch',wh_ch);
 T = 2e5;                        % Linear convolution
-x = randn(T, K, C);
+x = randn(T, D);
 y = randn(T+L-1, C);
 % Print a header
 fprintf('\n');
-fprintf('  L=%d,K=%d,C=%d,T=%d\n',L,K,C,T);
+fprintf('  L=%d,D=%d,C=%d,T=%d\n',L,D,C,T);
 fprintf('  %-10s | Runtime (ms)\n', '');
 fprintf('  %-10s | %6s  %6s\n', 'Function', 'f64','f32');
 if prm.do_gpu, fprintf('\b  %6s  %6s\n', 'f64gpu','f32gpu'); end
@@ -286,7 +288,7 @@ function test_fft_scaling_performance(prm)
 
 % Create the Convolver and example data
 [kernels, wh_ch] = create_random_kernels();
-[L,K,C] = size(kernels);
+[L,K,C] = size(kernels); D = K*C;
 A = spkdec.Convolver(kernels, 'wh_ch',wh_ch);
 T = 2e5;
 % Define the cases
@@ -315,7 +317,7 @@ for funcIdx = 1:2
                 N = N_arr(ii);
                 switch (funcIdx)
                     case 1 % conv()
-                        x = spkdec.Math.typeconv(randn(T,K,C), opt);
+                        x = spkdec.Math.typeconv(randn(T,D), opt);
                         A.conv(x, 'N_fft',N); % Warmup
                         lh.YData(ii) = time(@() A.conv(x,'N_fft',N),1);
                     case 2 % convT()

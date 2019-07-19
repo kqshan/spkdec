@@ -5,11 +5,12 @@ function y = conv_batch(self, x)
 % Returns:
 %   y       [T+L-1 x C x B] convolution output
 % Required arguments:
-%   x       [T x K x C x B] data to convolve with
+%   x       [T x D x B] data to convolve with
 
 % Some dimensions
-[T, K, C, B] = size(x);
-assert(K==self.K && C==self.C, self.errid_dim, 'x must be [T x K x C]');
+[T, D, B] = size(x);
+assert(D==self.D, self.errid_dim, 'x must be [T x D x B]');
+C = self.C;
 N = T + self.L - 1;
 output_real = isreal(x) && isreal(self.kernels);
 
@@ -17,9 +18,9 @@ output_real = isreal(x) && isreal(self.kernels);
 kern_hat = self.get_kernels_hat(N);
 
 % Permute so we can reuse the old code
-y = permute(x, [1 4 2 3]);      % [T x B x K x C]
+y = permute(x, [1 3 2]);        % [T x B x D]
 % Perform the convolution in frequency domain
-y = fft(y, N, 1);               % [N x B x K x C]
+y = fft(y, N, 1);               % [N x B x D]
 y = self.conv_hat(y, kern_hat); % [N x B x C]
 if output_real, sym_flag='symmetric'; else, sym_flag = 'nonsymmetric'; end
 y = ifft(y, N, 1, sym_flag);    % [N x B x C]

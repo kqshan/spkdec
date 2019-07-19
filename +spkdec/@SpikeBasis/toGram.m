@@ -10,7 +10,7 @@ if ~isempty(gram), return; end
 kernels = self.toKern();                        % [Lw x C x K*R x C]
 
 % Permute and reshape so that K*C are together and R is by itself
-[Lw, C, ~, ~] = size(kernels);
+[Lw, C, ~] = size(kernels);
 R = self.R; K = self.K;
 kernels = reshape(kernels, [Lw, C, K, R, C]);
 kernels = permute(kernels, [1 2 3 5 4]);

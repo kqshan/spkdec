@@ -3,7 +3,7 @@ function x = convT(self, y, varargin)
 %   x = convT(self, y, varargin)
 %
 % Returns:
-%   x       [T-L+1 x K x C] convolution output
+%   x       [T-L+1 x D] convolution output
 % Required arguments:
 %   y       [T x C] input data
 % Optional parametes (key/value pairs) [default]:
@@ -12,7 +12,7 @@ function x = convT(self, y, varargin)
 % Some dimensions
 [T, C] = size(y);
 assert(C==self.C, self.errid_dim, 'y must be [T x C]');
-K = self.K;
+D = self.D;
 ovlp = self.L - 1;
 N_auto = max(1024, pow2(2+nextpow2(ovlp+1)));
 output_real = isreal(y) && isreal(self.kernels);
@@ -42,6 +42,5 @@ if output_real, sym_flag='symmetric'; else, sym_flag = 'nonsymmetric'; end
 x = ifft(x, N, 1, sym_flag);
 %   Overlap-scrap and convert back into a vector
 x = self.batch_to_vec(x, T-ovlp, ovlp, false);
-x = reshape(x, [T-ovlp, K, C]);
 
 end

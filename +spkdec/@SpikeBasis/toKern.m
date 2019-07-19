@@ -3,8 +3,8 @@ function kern = toKern(self, varargin)
 %   kern = toKern(self, varargin)
 %
 % Returns:
-%   kern        [L+W-1 x C x K*R x C] matrix representing the whitened basis
-%               waveforms as a linear map: [K*R x C] --> [L+W-1 x C]
+%   kern        [L+W-1 x C x K*R*C] matrix representing the whitened basis
+%               waveforms as a linear map: [K*R*C] --> [L+W-1 x C]
 % Optional parameters (key/value pairs) [default]:
 %   flatten     Flatten output into a [(L+W-1)*C x K*R*C] matrix      [ false ]
 %
@@ -38,7 +38,7 @@ end
 if prm.flatten
     kern = reshape(kern, [Lw*C, K*R*C]);
 else
-    kern = reshape(kern, [Lw, C, K*R, C]);
+    kern = reshape(kern, [Lw, C, K*R*C]);
 end
 
 end

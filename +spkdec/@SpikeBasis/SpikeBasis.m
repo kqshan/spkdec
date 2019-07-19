@@ -237,8 +237,8 @@ end
 properties (Access=protected)
     % Convolver object, output of toConv() and used in solve()
     %
-    % This has K*R kernels per channel, so convolver.kernels should be seen as a
-    % a [L x K x R x C] matrix that has been reshaped to [L x K*R x C].
+    % This has K*R kernels per channel, so convolver.kernels should be seen as
+    % an [L x K x R x C] matrix that has been reshaped to [L x K*R x C].
     convolver
     
     % Gramians object, output of toGram() and used in solve()
