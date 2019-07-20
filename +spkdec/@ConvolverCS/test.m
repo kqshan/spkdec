@@ -1,6 +1,6 @@
 function test(varargin)
 % Run unit tests on this class
-%   Convolver.test( ... )
+%   ConvolverCS.test( ... )
 %
 % Optional parameters (key/value pairs) [default]:
 %   do_gpu      Run GPU-based tests             [ auto ]
@@ -14,9 +14,9 @@ ip = inputParser();
 ip.addParameter('do_gpu', [], @(x) isempty(x) || isscalar(x));
 ip.addParameter('benchmark', false, @isscalar);
 ip.addParameter('L_max', 600, @isscalar);
+ip.addParameter('K_max',  20, @isscalar);
 ip.addParameter('C_max',  16, @isscalar);
-ip.addParameter('D_max',  50, @isscalar);
-ip.addParameter('CDT_max', 1e6, @isscalar);
+ip.addParameter('KCT_max', 1e6, @isscalar);
 ip.addParameter('nCases', 10, @(x) isscalar(x) && x >= 6);
 ip.addParameter('tol', 10, @isscalar);
 ip.addParameter('verbose', false, @isscalar);
@@ -53,7 +53,7 @@ for test_func_cell = localfunctions()'
 end
 
 % Throw an error
-assert(isempty(errmsgs), 'spkdec:Convolver:TestFail', ...
+assert(isempty(errmsgs), 'spkdec:ConvolverCS:TestFail', ...
     sprintf('%s\n', errmsgs{:}));
 
 end
@@ -66,17 +66,17 @@ function test_object_management(~)
 % Run tests on basic object management (construction, copy, serialization)
 
 % Constructor with arguments
-kernels = create_random_kernels();
-[L,C,D] = size(kernels); t0 = randi(L);
-x = spkdec.Convolver(kernels, 't0',t0);
-assert(isequal(x.kernels,kernels) && isequal(x.t0,t0));
-assert(x.L==L && x.C==C && x.D==D);
+[kernels, wh_ch] = create_random_kernels();
+[L,K,C] = size(kernels);
+x = spkdec.ConvolverCS(kernels, 'wh_ch',wh_ch);
+assert(isequal(x.kernels_cs,kernels) && isequal(x.wh_ch,wh_ch));
+assert(x.L==L && x.K==K && x.C==C);
 % Copy
 y = x.copy();
 for fn = properties(x)', assert(isequal(x.(fn{1}),y.(fn{1}))); end
 % Serialization
 s = x.saveobj();
-y = spkdec.Convolver.loadobj(s);
+y = spkdec.ConvolverCS.loadobj(s);
 for fn = properties(x)', assert(isequal(x.(fn{1}),y.(fn{1}))); end
 
 end
@@ -87,10 +87,10 @@ function test_forward_convolution(prm)
 % Test the forward convolution
 %
 % Parameters:
-%   do_gpu, nCases, verbose, tol
+%   do_gpu, L_max, K_max, C_max, KCT_max, nCases, verbose, tol
 
 % Decide on the cases to try
-LCDT = randomize_case_dims(prm);
+LKCT = randomize_case_dims(prm);
 option_cases = struct('use_f32',{false; true}, 'use_gpu',false);
 if prm.do_gpu
     option_cases = [option_cases; option_cases];
@@ -100,8 +100,8 @@ end
 verbose = prm.verbose;
 if verbose
     fprintf('\n');
-    fprintf('  %-16s |     Error/eps\n', '  Dimensions');
-    fprintf('  %3s %2s %2s %6s | %6s  %6s\n', ...
+    fprintf('  %-17s |     Error/eps\n', '  Dimensions');
+    fprintf('  %3s %3s %2s %6s | %6s  %6s\n', ...
         'L','D','C','T', 'f64','f32' );
     if prm.do_gpu, fprintf('\b  %6s  %6s\n', 'f64gpu', 'f32gpu'); end
 end
@@ -109,21 +109,23 @@ end
 errmsg = {};
 for ii = 1:prm.nCases
     % Construct the data
-    LCD = LCDT(ii,1:3); T = LCDT(ii,4);
-    kernels = create_random_kernels(LCD);
-    [L,C,D] = size(kernels);
-    A = spkdec.Convolver(kernels);
+    LKC = LKCT(ii,1:3); T = LKCT(ii,4);
+    [kernels, wh_ch] = create_random_kernels(LKC);
+    [L,K,C] = size(kernels); D = K*C;
+    A = spkdec.ConvolverCS(kernels, 'wh_ch',wh_ch);
     x = randn(T, D);
-    if verbose, fprintf('  %3d %2d %2d %6d |',L,D,C,T); end
+    if verbose, fprintf('  %3d %3d %2d %6d |',L,D,C,T); end
     % Compute the reference result
     N_min = 1024; % Otherwise it gets real slow
     y_ref = zeros(T+(L-1),C);
-    for d = 1:D
-        kern = kernels(:,:,d);
-        if (L==1), kern = [kern; zeros(1,C)]; end %#ok<AGROW> % Damnit
-        y = fftfilt(kern, [x(:,d); zeros(L-1,1)], N_min);
-        y_ref = y_ref + y;
+    for c = 1:C
+        for k = 1:K
+            d = k + K*(c-1);
+            y = fftfilt(kernels(:,k,c), [x(:,d); zeros(L-1,1)], N_min);
+            y_ref(:,c) = y_ref(:,c) + y;
+        end
     end
+    y_ref = (wh_ch * y_ref.').';
     y_norm = norm(y_ref(:));
     % Try each of our option cases
     for opt = option_cases'
@@ -158,10 +160,10 @@ function test_transpose_convolution(prm)
 % Test the transpose convolution
 %
 % Parameters:
-%   do_gpu, nCases, verbose, tol
+%   do_gpu, L_max, K_max, C_max, KCT_max, nCases, verbose, tol
 
 % Decide on the cases to try
-LCDT = randomize_case_dims(prm);
+LKCT = randomize_case_dims(prm);
 option_cases = struct('use_f32',{false; true}, 'use_gpu',false);
 if prm.do_gpu
     option_cases = [option_cases; option_cases];
@@ -171,8 +173,8 @@ end
 verbose = prm.verbose;
 if verbose
     fprintf('\n');
-    fprintf('  %-16s |     Error/eps\n', '  Dimensions');
-    fprintf('  %3s %2s %2s %6s | %6s  %6s\n', ...
+    fprintf('  %-17s |     Error/eps\n', '  Dimensions');
+    fprintf('  %3s %3s %2s %6s | %6s  %6s\n', ...
         'L','D','C','T', 'f64','f32' );
     if prm.do_gpu, fprintf('\b  %6s  %6s\n', 'f64gpu', 'f32gpu'); end
 end
@@ -180,20 +182,22 @@ end
 errmsg = {};
 for ii = 1:prm.nCases
     % Construct the data
-    LCD = LCDT(ii,1:3); T = LCDT(ii,4);
-    kernels = create_random_kernels(LCD);
-    [L,C,D] = size(kernels);
-    A = spkdec.Convolver(kernels);
+    LKC = LKCT(ii,1:3); T = LKCT(ii,4);
+    [kernels, wh_ch] = create_random_kernels(LKC);
+    [L,K,C] = size(kernels); D = K*C;
+    A = spkdec.ConvolverCS(kernels, 'wh_ch',wh_ch);
     y = randn(T+(L-1), C);
-    if verbose, fprintf('  %3d %2d %2d %6d |',L,D,C,T); end
+    if verbose, fprintf('  %3d %3d %2d %6d |',L,D,C,T); end
     % Compute the reference result
     N_min = 1024; % Otherwise it gets real slow
+    y_wh = (wh_ch' * y.').';
     x_ref = zeros(T,D);
-    for d = 1:D
-        kern = flipud(conj(kernels(:,:,d)));
-        if (L==1), kern = [kern; zeros(1,C)]; end %#ok<AGROW> % Damnit
-        x = fftfilt(kern, y, N_min);
-        x_ref(:,d) = sum(x(L:end,:), 2);
+    for c = 1:C
+        for k = 1:K
+            d = k + K*(c-1);
+            x = fftfilt(flipud(conj(kernels(:,k,c))), y_wh(:,c), N_min);
+            x_ref(:,d) = x(L:end);
+        end
     end
     x_norm = norm(x_ref(:));
     % Try each of our option cases
@@ -230,10 +234,10 @@ function test_convolution_performance(prm)
 % Parameters:
 %   do_gpu
 
-% Create the Convolver and example data
-kernels = create_random_kernels();
-[L,C,D] = size(kernels);
-A = spkdec.Convolver(kernels);
+% Create the ConvolverCS and example data
+[kernels, wh_ch] = create_random_kernels();
+[L,K,C] = size(kernels); D = K*C;
+A = spkdec.ConvolverCS(kernels, 'wh_ch',wh_ch);
 T = 2e5;                        % Linear convolution
 x = randn(T, D);
 y = randn(T+L-1, C);
@@ -282,10 +286,10 @@ function test_fft_scaling_performance(prm)
 % Parameters:
 %   do_gpu
 
-% Create the Convolver and example data
-kernels = create_random_kernels();
-[L,C,D] = size(kernels);
-A = spkdec.Convolver(kernels);
+% Create the ConvolverCS and example data
+[kernels, wh_ch] = create_random_kernels();
+[L,K,C] = size(kernels); D = K*C;
+A = spkdec.ConvolverCS(kernels, 'wh_ch',wh_ch);
 T = 2e5;
 % Define the cases
 N_arr = pow2(9:16);
@@ -340,40 +344,42 @@ end
 % ------------------------------     Helpers     -------------------------------
 
 
-function kernels = create_random_kernels(LCD)
+function [kernels, wh_ch] = create_random_kernels(LKC)
 % Randomly create some problem data
-%   kernels = create_random_kernels(LCD)
+%   [kernels, wh_ch] = create_random_kernels(LKC)
 % Returns:
-%   kernel      [L x C x D] spike basis waveforms
+%   kernel      [L x K x C] spike basis waveforms
+%   wh_ch       [C x C] cross-channel whitener
 % Optional arguments [default]:
-%   LCD         [L, C, D] dimensions                [ 125 4 15 ]
-if (nargin < 1), LCD = [125 4 15]; end
-L = LCD(1); C = LCD(2); D = LCD(3);
+%   LKC         [L, K, C] dimensions                [ 125 6 4 ]
+if (nargin < 1), LKC = [125 6 4]; end
+L = LKC(1); K = LKC(2); C = LKC(3);
 % Generate the arrays
-kernels = randn(L,C,D);
+kernels = randn(L,K,C);
+wh_ch = randn(C,C);
 end
 
 
-function LCDT = randomize_case_dims(prm)
+function LKCT = randomize_case_dims(prm)
 % Randomly select the dimensions of the test cases to try
-%   LCDT = randomize_case_dims(prm)
+%   LKCT = randomize_case_dims(prm)
 %
 % Returns:
-%   LCDT    [nCases x 4] dimensions: [L C D T]
+%   LKCT    [nCases x 4] dimensions: [L K C T]
 % Required arguments:
-%   prm     Struct with fields L_max,C_max,D_max,CDT_max
+%   prm     Struct with fields L_max,K_max,C_max,KCT_max
 N = prm.nCases;
 L = randi(prm.L_max, [N 1]);
+K = randi(prm.K_max, [N 1]);
 C = randi(prm.C_max, [N 1]);
-D = randi(prm.D_max, [N 1]);
-T_max = floor(prm.CDT_max ./ (C.*D));
+T_max = floor(prm.KCT_max ./ (K.*C));
 T = ceil(T_max .* rand(N,1));
-LCDT = [L C D T];
+LKCT = [L K C T];
 % Use a deterministic one for the first case
-LCDT(1,:) = [125 4 15 20e3];
+LKCT(1,:) = [125 6 4 20e3];
 % And for the next 4 cases, set one of the dimensions to 1 to make sure that we
 % can handle edge cases like these
 for ii = 1:4
-    LCDT(ii+1,ii) = 1;
+    LKCT(ii+1,ii) = 1;
 end
 end

@@ -133,9 +133,10 @@ end
 
 methods
     function conv = toConv(self)
-        % Return a Convolver object implementing this whitening operation
+        % Return a ConvolverCS object implementing this whitening operation
         %   conv = toConv(self)
-        conv = spkdec.Convolver(reshape(self.wh_filt, [self.W, 1, self.C]), ...
+        conv = spkdec.ConvolverCS( ...
+            reshape(self.wh_filt, [self.W, 1, self.C]), ...
             'wh_ch',self.wh_ch, 't0',self.delay+1);
     end
     

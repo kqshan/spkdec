@@ -34,7 +34,7 @@ end
 
 % Construct the Convolver object
 wh_t0 = self.t0 + whitener.delay;
-conv = spkdec.Convolver(kern, 'wh_ch',whitener.wh_ch, 't0',wh_t0);
+conv = spkdec.ConvolverCS(kern, 'wh_ch',whitener.wh_ch, 't0',wh_t0);
 
 % Cache this result
 self.convolver = conv;

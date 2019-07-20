@@ -1,9 +1,9 @@
-function k_hat = get_kernels_hat(self, N)
+function kcs_hat = get_kernels_cs_hat(self, N)
 % Populate the cache with the kernel waveforms in DFT domain
-%   k_hat = get_kernels_hat(self, N)
+%   kcs_hat = get_kernels_cs_hat(self, N);
 %
 % Returns:
-%   k_hat   [N x C x D] kernels in DFT domain (as causal kernels)
+%   kcs_hat [N x K x C] channel-specific kernels in DFT domain (causal)
 % Required arguments:
 %   N       DFT size
 %
@@ -11,15 +11,15 @@ function k_hat = get_kernels_hat(self, N)
 % the behavior of fft().
 
 % Look in the cache
-if size(self.kernels_hat,1)==N
-    k_hat = self.kernels_hat;
+if size(self.kernels_cs_hat,1)==N
+    kcs_hat = self.kernels_cs_hat;
     return
 end
 
 % Perform the FFT
-k_hat = fft(self.kernels, N, 1);
+kcs_hat = fft(self.kernels_cs, N, 1);
 
 % Cache the result
-self.kernels_hat = k_hat;
+self.kernels_hat = kcs_hat;
 
 end

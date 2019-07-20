@@ -1,19 +1,16 @@
-% Convolution with a set of channel-specific kernels
+% Causal convolution with a set of kernels
 %
 % Convolver properties (read-only):
 % Dimensions
-%   C           - Number of data channels (convolution output dimension)
-%   K           - Number of convolution kernels per channel
-%   D           - Number of convolution kernels (convolution input dimension)
 %   L           - Kernel length (#samples)
+%   C           - Number of data channels (convolution output dimension)
+%   D           - Number of convolution kernels (convolution input dimension)
 % Data
-%   kernels     - [L x K x C] convolution kernels for each channel
-%   wh_ch       - [C x C] cross-channel transform applied to convolution output
+%   kernels     - [L x C x D] convolution kernels
 %   t0          - Sample index (1..L) corresponding to t=0
 %
 % Convolver methods:
 %   Convolver   - Construct a new Convolver object
-%   toKern      - Return a matrix representing the effective kernels
 % Convolution
 %   conv        - Perform the forward convolution
 %   convT       - Perform the transpose convolution
@@ -32,56 +29,41 @@ classdef Convolver < matlab.mixin.Copyable
 
 
 properties (SetAccess=private, Dependent)
-    % Number of data channels (convolution outputs)
-    C
-    
-    % Number of convolution kernels per channel
-    % The total number of kernels is K*C
-    K
-    
-    % Number of convolution kernels overall
-    % For this class, D = K*C
-    D
-    
     % Kernel length (# of samples)
+    %
     % All kernels have the same length and <t0>
     L
+
+    % Number of data channels (convolution output dimension)
+    C
+    
+    % Number of convolution kernels (convolution input dimension)
+    D
 end
 methods
-    function val = get.C(self), val = size(self.kernels,3); end
-    function val = get.K(self), val = size(self.kernels,2); end
-    function val = get.D(self), val = self.K * self.C;      end
     function val = get.L(self), val = size(self.kernels,1); end
+    function val = get.C(self), val = size(self.kernels,2); end
+    function val = get.D(self), val = size(self.kernels,3); end
 end
 
 properties (SetAccess=protected)
-    % [L x K x C] convolution kernels for each channel
+    % [L x C x D] convolution kernels
     %
-    % Each of these is restricted to a single channel, as this makes the
-    % convolution faster to perform and is often convenient for interpreting the
-    % resulting feature space. The forward convolution involves summing over the
-    % K kernels for each channel.
-    %
-    % Why [L x K x C] rather than [L x C x K]? The latter would make the special
-    % case of K==1 easier to deal with, and make subsample interpolation (in
-    % which the subsample-shifted kernels appear as additional kernels) easier
-    % to implement. Alas, this is because this code evolved from single-channel
-    % convolution and it's too much work to go back and change the order now.
+    % Each of the D kernels is represented as [L x C] waveforms on each channel.
+    % If all kernels are restricted to a single channel each, and there is the
+    % same number of kernels for each channel, then consider using the channel-
+    % specific subclass spkdec.ConvolverCS instead.
     kernels
     
-    % [C x C] cross-channel transform
-    % This is applied at the end of the forward convolution (or start of the
-    % transpose convolution).
-    wh_ch = 1;
-    
     % Kernel sample index (1..L) corresponding to t=0
+    %
     % This property is not actually used by any of the methods in this class,
     % but it is a useful piece of information to keep track of and it is
     % convenient for it to be associated with this object.
     t0 = 1;
 end
 
-properties (Constant, Access=private)
+properties (Constant, Hidden)
     errid_dim = 'spkdec:Convolver:DimMismatch';
     errid_arg = 'spkdec:Convolver:BadArg';
 end
@@ -98,22 +80,15 @@ methods
         %   obj = Convolver(kernels, ...)
         %
         % Required arguments:
-        %   kernels   [L x K x C] convolution kernels
+        %   kernels   [L x C x D] convolution kernels
         % Optional parameters (key/value pairs) [default]:
-        %   wh_ch     [C x C] cross-channel transform       [ eye(C) ]
         %   t0        Sample index (1..L) for t=0           [ 1 ]
-        [~,~,C] = size(kernels);
-        % Parse optional parameters
         ip = inputParser();
-        ip.addParameter('wh_ch', eye(C), @ismatrix);
         ip.addParameter('t0', 1, @isscalar);
         ip.parse( varargin{:} );
         prm = ip.Results;
-        assert(isequal(size(prm.wh_ch),[C C]), obj.errid_arg, ...
-            'wh_ch must be a square, [C x C] matrix');
         % Assign values
         obj.kernels = gather(double(kernels));
-        obj.wh_ch = gather(double(prm.wh_ch));
         obj.t0 = gather(double(prm.t0));
     end
     
@@ -122,9 +97,6 @@ methods
     y = conv(self, x, varargin);
     x = convT(self, y, varargin);
     y = conv_batch(self, x);
-    
-    % Representation in a different form
-    mat = toKern(self, varargin);
 end
 
 methods (Static)
@@ -137,7 +109,7 @@ end
 methods
     function s = saveobj(self)
         s = struct();
-        for fn = {'kernels','wh_ch','t0'}
+        for fn = {'kernels','t0'}
             s.(fn{1}) = self.(fn{1});
         end
     end
@@ -157,11 +129,7 @@ end
 % Caches
 
 properties (Access=protected)
-    % [L x C x D] conv. kernels after the applying cross-channel transform.
-    % This is used in toMat()
-    kernels_full
-    
-    % [N_fft x K x C] kernels in frequency domain (as a causal filter).
+    % [N_fft x C x D] kernels in frequency domain (as a causal filter).
     % This is used in get_kernels_hat()
     kernels_hat
 end
@@ -169,6 +137,10 @@ end
 methods (Access=protected)
     % Return the convolution kernels in frequency domain
     k_hat = get_kernels_hat(self, N);
+    
+    % Convolution in frequency domain
+    y_hat = conv_hat(self, x_hat);
+    x_hat = convT_hat(self, y_hat);
 end
 
 % Convolution sub-steps
@@ -177,9 +149,6 @@ methods (Access=protected, Static)
     % Conversion to/from overlap-add or overlap-scrap batches
     y = vec_to_batch(x, N, ovlp, dupe);
     x = batch_to_vec(y, T, ovlp, add);
-    % Convolution in frequency domain
-    y_hat = conv_hat(x_hat, kern_hat);
-    x_hat = convT_hat(y_hat, kern_hat);
 end
 
 
