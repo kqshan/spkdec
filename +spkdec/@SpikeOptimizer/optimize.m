@@ -3,7 +3,7 @@ function [basis, spk, resid] = optimize(self, data, varargin)
 %   [basis, spk, resid] = optimize(self, data, ...)
 %
 % Returns:
-%   basis       [L x K x C] optimized spike basis waveforms
+%   basis       [L x K x C] optimized channel-specific spike basis waveforms
 %   spk         Spikes object (where t is the shift in detected spike time)
 %   resid       [L+W-1 x C x N] spike residuals (whitened) after optimization
 % Required arguments:

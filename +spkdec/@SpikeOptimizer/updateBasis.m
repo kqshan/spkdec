@@ -3,10 +3,10 @@ function [basis_obj, spk_new] = updateBasis(self, basis, spk, resid, varargin)
 %   [basis_new, spk_new] = updateBasis(self, basis, spk, resid, ...)
 %
 % Returns:
-%   basis_new   New SpikeBasis with updated basis waveforms
+%   basis_new   New SpikeBasisCS with updated basis waveforms
 %   spk_new     Detected spikes (Spikes object) after optimization
 % Required arguments:
-%   basis       SpikeBasis object
+%   basis       SpikeBasisCS object
 %   spk         Detected spikes (Spikes object)
 %   resid       [L+W-1 x C x N] spike residuals (whitened)
 % Optional parameters (key/value pairs) [default]:
@@ -36,7 +36,7 @@ prm = ip.Results;
 
 % Reconstruct the spike waveforms (also performs input checks)
 spikes = self.reconstruct_spikes(basis, spk, resid);
-basis_old = basis.basis;
+basis_old = basis.basis_cs;
 
 % Define lambda if necessary
 lambda = prm.lambda;
@@ -58,7 +58,7 @@ end
     'lambda',lambda, 'basis_prev',basis_old);
 
 % Construct the SpikeBasis object
-basis_obj = basis.copy_modify(basis_new);
+basis_obj = basis.copy_modifyCS(basis_new);
 
 % spk_new.t is currently spike offsets, so add these to the original spk.t
 spk_new.shiftTimes(spk.t);

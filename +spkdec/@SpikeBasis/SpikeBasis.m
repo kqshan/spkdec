@@ -2,15 +2,14 @@
 %
 % SpikeBasis properties (read-only):
 % Dimensions
-%   C           - Number of data channels
-%   K           - Number of spike basis waveforms per channel
-%   D           - Number of spike basis waveforms overall
 %   L           - Basis waveform length (#samples) before whitening
+%   C           - Number of data channels
+%   D           - Number of spike basis waveforms
 %   W           - Frequency-whitening filter length (#samples)
 %   V           - Overall overlap length (#samples), V = L-1 + W-1
 %   R           - Sub-sample interpolation ratio (1 = no interpolation)
 % Data
-%   basis       - [L x K x C] spike basis waveforms (unwhitened)
+%   basis       - [L x C x D] spike basis waveforms (unwhitened)
 %   t0          - Sample index (1..L) corresponding to t=0
 %   whitener    - Whitener object describing the whitening
 %   interp      - Interpolator object describing sub-sample shifts
@@ -21,7 +20,6 @@
 %   copy_modify - Create a copy with a modified basis
 %   copy_nonWh  - Create a copy of this basis without whitening
 % Data conversions
-%   toConv      - Return a Convolver object for the whitened basis
 %   toKern      - Return a matrix of the whitened basis waveforms
 %   toGram      - Return a Gramians object (dot products of the spike basis)
 %   toWhBasis   - Return a WhitenerBasis for this whitener and interp
@@ -48,20 +46,15 @@ classdef SpikeBasis < matlab.mixin.Copyable
 
 
 properties (SetAccess=private, Dependent)
-    % Number of data channels
-    C
-    
-    % Number of spike basis waveforms per channel
-    % The total number of kernels is K*C
-    % See also: spkdec.SpikeBasis.D
-    K
-    
-    % Number of spike basis waveforms overall
-    D
-    
     % Basis waveform length (#samples) before whitening
     % All basis waveforms have the same length.
     L
+    
+    % Number of data channels
+    C
+    
+    % Number of spike basis waveforms overall
+    D
     
     % Frequency-whitening filter length (#samples)
     W
@@ -73,20 +66,21 @@ properties (SetAccess=private, Dependent)
     R
 end
 methods
-    function val = get.C(self), val = size(self.basis,3);  end
-    function val = get.K(self), val = size(self.basis,2);  end
-    function val = get.D(self), val = self.K * self.C;     end
     function val = get.L(self), val = size(self.basis,1);  end
+    function val = get.C(self), val = size(self.basis,2);  end
+    function val = get.D(self), val = size(self.basis,3);  end
     function val = get.W(self), val = self.whitener.W;     end
     function val = get.V(self), val = self.L-1 + self.W-1; end
     function val = get.R(self), val = self.interp.R;       end
 end
 
 properties (SetAccess=protected)
-    % [L x K x C] spike basis waveforms (unwhitened)
+    % [L x C x D] spike basis waveforms (unwhitened)
     %
-    % Basis waveforms are specific to a particular channel. This allows for more
-    % efficient convolution and makes the feature space easier to interpret.
+    % Each of the D spike basis waveforms is represented as [L x C] waveforms on
+    % each channel. If all waveforms are restricted to a single channel, and
+    % there is the same number of waveforms for each channel, then consider
+    % using the channel-specific subclass spkdec.SpikeBasisCS instead.
     basis
     
     % Sample index (1..L) corresponding to t=0
@@ -118,7 +112,7 @@ properties (SetAccess=protected)
     interp
 end
 
-properties (Constant, Access=private)
+properties (Constant, Hidden)
     errid_arg = 'spkdec:SpikeBasis:BadArg';
     errid_dim = 'spkdec:SpikeBasis:DimMismatch';
 end
@@ -135,12 +129,12 @@ methods
         %   obj = SpikeBasis(basis, ...)
         %
         % Required arguments:
-        %   basis       [L x K x C] spike basis waveforms
+        %   basis       [L x C x D] spike basis waveforms
         % Optional parameters (key/value pairs) [default]:
         %   t0          Sample index (1..L) for t=0     [ 1 ]
         %   whitener    Whitener object                 [ none ]
         %   interp      Interpolator object             [ none ]
-        [L,~,C] = size(basis);
+        [L,C,~] = size(basis);
         ip = inputParser();
         ip.addParameter('t0', 1, @isscalar);
         ip.addParameter('whitener', [], ...
@@ -178,7 +172,6 @@ methods
     
     % Data conversions
     kern = toKern(self, varargin);
-    conv = toConv(self);
     gram = toGram(self);
     whbasis = toWhBasis(self);
     
@@ -235,11 +228,11 @@ end
 % ------------------------------------------------------------------------------
 
 % Caches
+
 properties (Access=protected)
-    % ConvolverCS object, output of toConv() and used in solve()
+    % Convolver object, output of toConv() and used in convolution methods
     %
-    % This has K*R kernels per channel, so convolver.kernels should be seen as
-    % an [L x K x R x C] matrix that has been reshaped to [L x K*R x C].
+    % This has D*R kernels, and convolver.kernels is [L+W-1 x C x D*R].
     convolver
     
     % Gramians object, output of toGram() and used in solve()
@@ -257,6 +250,20 @@ properties (Access=protected)
 end
 
 methods (Access=protected)
+    function conv = toConv(self)
+        % Construct a spkdec.Convolver object for the whitened basis waveforms
+        %   conv = toConv(self)
+        %
+        % Returns:
+        %   conv    spkdec.Convolver object with [L+W-1 x C x D*R] kernels
+        conv = self.convolver;
+        if ~isempty(conv), return; end
+        kern = self.toKern();
+        wh_t0 = self.t0 + self.whitener.delay;
+        conv = spkdec.Convolver(kern(:,:,:), 't0',wh_t0);
+        self.convolver = conv;
+    end
+
     function H0 = get_gram_chol(self)
         % Compute the Cholesky decomposition of the Gram matrices at lag 0
         %   H_0 = get_gram_chol(self)

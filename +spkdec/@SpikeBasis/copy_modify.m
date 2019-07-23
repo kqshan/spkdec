@@ -5,9 +5,9 @@ function basis_mod = copy_modify(self, newbasis)
 % Returns:
 %   basis_mod   New SpikeBasis object
 % Required arguments:
-%   newbasis    [L x K x C] new basis waveforms
+%   newbasis    [L x C x D] new basis waveforms
 
-[L,~,C] = size(newbasis);
+[L,C,~] = size(newbasis);
 assert(L==self.L && C==self.C, self.errid_dim, ...
     'newbasis must have the same L and C as the current one');
 

@@ -19,22 +19,12 @@ prm = ip.Results;
 
 % Check some dimensions
 [D,N] = size(spk.X);
-[L,K,C] = size(self.basis);
-assert(D == K*C, self.errid_dim, 'Feature dimensions must match K * C');
+[L,C,D_] = size(self.basis);
+assert(D==D_, self.errid_dim, 'Spikes must have D=%d dimensions',D_);
 
-% 1. Multiply by the spike basis -----------------------------------------------
-
-% Separate out the features by channel
-spk_X = reshape(spk.X, [K C N]);        % [K x C x N]
-spk_X = permute(spk_X, [1 3 2]);        % [K x N x C]
-
-% Reconstruct the raw (unwhitened and unshifted) waveforms
-spikes = zeros(L,C,N, 'like',spk_X);    % [L x C x N]
-for c = 1:C
-    spikes(:,c,:) = reshape(self.basis(:,:,c) * spk_X(:,:,c), [L 1 N]);
-end
-
-% 2. Apply the whitening and sub-sample shift ----------------------------------
+% Multiply by the spike basis
+spikes = reshape(self.basis,[L*C, D]) * spk.X;
+spikes = reshape(spikes, [L C N]);
 
 % Apply the sub-sample shift
 if prm.subshift

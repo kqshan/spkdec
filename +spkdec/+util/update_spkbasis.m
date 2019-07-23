@@ -3,10 +3,10 @@ function [basis_new, spk_new] = update_spkbasis(basis, src, varargin)
 %   [basis, spk] = update_spkbasis(basis, src, ...)
 %
 % Returns:
-%   basis       New SpikeBasis with updated basis waveforms
+%   basis       New SpikeBasisCS with updated basis waveforms
 %   spk         Detected spikes (Spikes object)
 % Required arguments:
-%   basis       Original spike basis waveforms (SpikeBasis object)
+%   basis       Original spike basis waveforms (SpikeBasisCS object)
 %   data        [Inf x C] DataSrc object to read raw data from
 % Optional parameters (key/value pairs) [default]:
 %   solver      Solver object to detect spikes with         [ auto ]

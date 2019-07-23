@@ -1,9 +1,9 @@
 function [basis_obj, spk] = makeBasis(self, spikes, K, varargin)
-% Construct a new SpikeBasis optimized for the given spike waveforms
+% Construct a new SpikeBasisCS optimized for the given spike waveforms
 %   [basis, spk] = makeBasis(self, spikes, K, ...)
 %
 % Returns:
-%   basis       New SpikeBasis object
+%   basis       New SpikeBasisCS object
 %   spk         Spikes object (where t is the shift in detected spike time)
 % Required arguments:
 %   spikes      [L+W-1 x C x N] whitened spike waveforms
@@ -38,7 +38,7 @@ basis = basis .* reshape(sgn, [1 K C]);
 spk.setFeat(sgn .* spk.X);
 
 % Construct the SpikeBasis object
-basis_obj = spkdec.SpikeBasis(basis, 't0',prm.t0, ...
+basis_obj = spkdec.SpikeBasisCS(basis, 't0',prm.t0, ...
     'whitener',self.whbasis.whitener, 'interp',self.whbasis.interp);
 
 end

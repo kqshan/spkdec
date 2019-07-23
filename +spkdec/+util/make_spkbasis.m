@@ -1,9 +1,9 @@
 function basis = make_spkbasis(src, whitener, varargin)
-% Create a SpikeBasis object for spike detection in the given source
+% Create a SpikeBasisCS object for spike detection in the given source
 %   basis = make_spkbasis(src, ...)
 %
 % Returns:
-%   basis       SpikeBasis object fitted to the given source
+%   basis       SpikeBasisCS object fitted to the given source
 % Required arguments:
 %   src         [Inf x C] DataSrc object to read raw data from
 %   whitener    Whitener object for measuring approximation error
@@ -137,14 +137,14 @@ if prm.make_ind
     spk_X = permute(spk_X, [1 3 2]); % [K x N x C]
     spk_X = gather(double(spk_X));
     % Perform the rotations on each channel independently
-    basis_new = basis.basis;    % [L x K x C]
+    basis_new = basis.basis_cs; % [L x K x C]
     for c = 1:C
         % Reconstructed spikes = A*X = A*U*S*V'. Let us define
         %       A2 = A * U      X2 = S * V'
         % Then we still have A2*X2 == A*X, but now the rows of X2 are orthogonal
         % and sorted in descending order of 2-norm.
         [U,~,V] = svd(spk_X(:,:,c), 'econ');
-        A2 = basis.basis(:,:,c) * U;
+        A2 = basis.basis_cs(:,:,c) * U;
         % For sign consistency, let's flip the sign of the first basis waveform
         % so that its corresponding feature dimension is generally positive.
         % Note that S > 0, so sign(X2) == sign(V').
@@ -162,7 +162,7 @@ if prm.make_ind
         basis_new(:,:,c) = A2;
     end
     % Create a new SpikeBasis object with this rotated basis
-    basis = basis.copy_modify(basis_new); 
+    basis = basis.copy_modifyCS(basis_new);
 end
 
 % Report the total elapsed time

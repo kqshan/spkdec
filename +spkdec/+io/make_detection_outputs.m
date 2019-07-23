@@ -6,7 +6,7 @@ function [outputs, sinks] = make_detection_outputs(basis, varargin)
 %   outputs     Struct of DataSink objects compatible with util.detect_spikes()
 %   sinks       Nested struct of underlying DataSinks and attributes (see below)
 % Required arguments:
-%   basis       SpikeBasis that will be used for spike detection
+%   basis       SpikeBasisCS that will be used for spike detection
 % Optional parameters (key/value pairs):
 %   filename    HDF5 output filename, or empty to use DataSinkMatrix objects
 %               instead. Default = [].
@@ -173,7 +173,7 @@ outputs.resid = spkdec.io.ResidSink( basis.toWhBasis(), ...
 %% Add the other attributes
 
 % Add them to the <sinks> struct
-sinks.feature.basis = basis.basis;
+sinks.feature.basis = basis.basis_cs;
 sinks.feature.t0 = basis.t0;
 sinks.subidx.R = basis.R;
 sinks.subidx.subshift = basis.interp.shifts;

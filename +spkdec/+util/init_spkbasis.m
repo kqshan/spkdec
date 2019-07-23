@@ -3,7 +3,7 @@ function [basis, spk] = init_spkbasis(optimizer, src, K, varargin)
 %   [basis, spk] = init_spkbasis(optimizer, src, K, ... )
 %
 % Returns:
-%   basis       New SpikeBasis object
+%   basis       New SpikeBasisCS object
 %   spk         Detected spikes (Spikes object) where t is a shift in spike time
 % Required arguments:
 %   optimizer   SpikeOptimizer object used to optimize the spike basis
