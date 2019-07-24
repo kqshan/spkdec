@@ -80,16 +80,23 @@ map_21 = reshape(map_21, [L*C, L, C]);
 map_21r = zeros(L*C, L, C, R);
 for c = 1:C
     % Apply the condition number bound if necessary
-    wh_02_c = wh_02(:,:,c);
-    if cond(wh_02_c) > max_cond
-        [U,S,V] = svd(wh_02_c);
-        S = diag(max(diag(S), S(1)/max_cond));
-        wh_02_c = U * S * V';
-    end
+    wh_02_c = impose_max_cond(wh_02(:,:,c), max_cond);
     % map_21r = map_21 * wh_02r(:,:,r) / wh_02
     for r = 1:R
         map_21r(:,:,c,r) = map_21(:,:,c) * wh_02r(:,:,c,r) / wh_02_c;
     end
+end
+
+% Get the sub-sample shift in Q1 coordinates
+%   shift1r : [L*C x L*C x R]
+shift1r = zeros(L*C, L*C, R);
+% Apply the condition number bound if necessary
+wh_01_mat = reshape(wh_01, [L*C, L*C]);
+wh_01_mat = impose_max_cond(wh_01_mat, max_cond);
+% shift1r = wh_01r(:,:,r) / wh_01
+for r = 1:R
+    wh_01r_mat = reshape(wh_01r(:,:,:,r), [L*C, L*C]);
+    shift1r(:,:,r) = wh_01r_mat / wh_01_mat;
 end
 
 % Assign these values to self
@@ -97,10 +104,30 @@ self.wh_00  = reshape(whiten, [Lw, C, L, C]);
 self.Q1     = Q1;
 self.wh_01  = wh_01;
 self.wh_01r = wh_01r;
+self.shift1r = shift1r;
 self.Q2     = Q2;
 self.wh_02  = wh_02;
 self.wh_02r = wh_02r;
 self.map_21 = map_21;
 self.map_21r = map_21r;
 
+end
+
+
+% ------------------------     Helper functions     ----------------------------
+
+function X = impose_max_cond(X, max_cond)
+% Impose a bound on the maximum condition number
+%   X = impose_max_cond(X, max_cond)
+%
+% Returns:
+%   X           Same matrix with a constraint on the maximum condition number
+% Required arguments:
+%   X           Square matrix
+%   max_cond    Upper bound on the desired condition number
+if cond(X) > max_cond
+    [U,S,V] = svd(X);
+    S = diag(max(diag(S), S(1)/max_cond));
+    X = U * S * V';
+end
 end

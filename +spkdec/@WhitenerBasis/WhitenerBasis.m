@@ -85,6 +85,7 @@ properties (SetAccess=protected)
     % Maximum condition number (imposed when inverting matrices)
     %
     % This is used in the following operations:
+    % * Constructing shift1r requires inverting wh_01
     % * Constructing map_21r requires inverting wh_02
     % * Member function unwhiten() requires inverting wh_01
     %
@@ -94,8 +95,8 @@ properties (SetAccess=protected)
     %   sig = diag(Sigma);
     %   X_new = U * diag(max(sig, sig(1)/max_cond)) * V'
     %
-    % We typically have cond(wh_02) < cond(wh_01), so it's the unwhiten() method
-    % that is more likely to be affected by this.
+    % We typically have cond(wh_02) < cond(wh_01), so it's shift1r and the
+    % unwhiten() method that are most likely to be affected by this.
     max_cond
 end
 
@@ -157,6 +158,19 @@ properties (SetAccess=protected)
     % where blkdiagify(...) returns a [L*C x L*C] block diagonal matrix with C
     % copies of interp.shifts(:,:,r) along its diagonal.
     wh_01r
+    
+    % Sub-sample interpolation in Q1 coordinates
+    %
+    % [L*C x L*C x R] array that describes the effect of the sub-sample shifts
+    % in terms of Q1 coordinates. For each r,
+    %   shift1r(:,:,r) = wh_01r(:,:,r) / wh_01
+    % where wh_01r is interpreted as a [L*c x L*C x R] matrix and wh_01 as a
+    % [L*C x L*C] matrix (with the max_cond constraint imposed).
+    %
+    % This comes up when optimizing spike basis waveforms in the omni-channel
+    % (as opposed to channel-specific) case. Note that shift1r may not be
+    % invertible.
+    shift1r
     
     % Channelwise orthonormal basis for the output (span) of the whitener
     %
