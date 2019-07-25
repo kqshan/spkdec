@@ -16,7 +16,7 @@
 % SpikeOptimizer methods:
 %   SpikeOptimizer  - Construct a new SpikeOptimizer object
 %   optimize    - Find a basis that minimizes reconstruction error
-%   unwhiten    - Find the raw waveform that approximates the whitened data
+%   optimizeCS  - Find a channel-specific basis that minimizes rec. error
 % High-level operations
 %   makeBasis   - Construct a new SpikeBasis, optimized for the given spikes
 %   updateBasis - Update a spike basis using proximal gradient descent
@@ -150,12 +150,10 @@ methods
     
     % Main optimization routine
     [basis, spk, resid] = optimize(self, spikes, varargin);
-    
-    % Just a wrapper for WhitenerBasis.unwhiten
-    spikes_raw = unwhiten(self, spikes_wh);
+    [basis_cs, spk, resid] = optimizeCS(self, spikes, varargin);
     
     % High-level operations
-    [basis, spk] = makeBasis(self, spikes, K, varargin);
+    [basis, spk] = makeBasis(self, spikes, D, varargin);
     [basis, spk] = updateBasis(self, basis, spk, resid, varargin);
 end
 
@@ -193,11 +191,12 @@ end
 methods (Access=protected)
     % Initialization
     Y = convert_spikes_to_Y(self, spikes, pad);
-    A0 = init_spkbasis(self, K);
+    A0 = init_spkbasis(self, D);
     
     % Optimize spikes with basis held constant
     X = optimize_spk(self, A);
     err = eval_error(self, A, X);
+    Ar = get_shifted_basis(self, A, r);
     
     % Proximal gradient descent on the basis, with spikes held constant
     grad = compute_gradient(self, A, X);
@@ -219,7 +218,10 @@ end
 properties (Access=protected, Transient)
     Y           % [L*C x N x S] spike data in the Q1 basis, with the S dimension
                 % corresponding to shifts of (-dt_search:dt_search)
-    A0          % [L x K x C] whitened previous basis in Q2 basis
+    basis_mode  % Basis constraints: {'channel-specific','omni-channel'}
+    A0          % Whitened previous basis. Dimensions depend on basis_mode:
+                %   channel-specific  [L x K x C] in Q2 basis
+                %   omni-channel      [L*C x D] in Q1 basis
     lambda      % Weight applied to the proximal regularizer ||A-A0||
     spk_r       % User-specified sub-sample shift for each spike
     t_start     % tic() when we started this problem
@@ -242,7 +244,12 @@ methods (Access=protected)
     function lipschitz_init(self, X)
         % Initialize the Lipschitz estimate (requires the spikes X)
         %   lipschitz_init(self, X)
-        norm_map21 = norm(self.whbasis.map_21(:,:));
+        switch self.basis_mode
+            case 'channel-specific'
+                norm_map21 = norm(self.whbasis.map_21(:,:));
+            case 'omni-channel'
+                norm_map21 = 1;
+        end
         norm_XXt = 0;
         for r = 1:self.R
             norm_XXt = norm_XXt + norm(X.X_cov(:,:,r) * X.X_cov(:,:,r)');

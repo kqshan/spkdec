@@ -8,9 +8,9 @@ verbose = self.verbose;
 
 % Print a simple header
 if verbose
-    [~,N,S] = size(self.Y); [L,K,C] = size(self.A0);
-    fprintf('optimize() started at %s (L=%d, K=%d, C=%d, N=%d)\n', ...
-        datestr(now(),31), L, K, C, N);
+    [~,N,S] = size(self.Y); [~,D] = size(self.A0); L = self.L; C = self.C;
+    fprintf('optimize() started at %s (L=%d, C=%d, D=%d, N=%d)\n', ...
+        datestr(now(),31), L, C, D, N);
     s_idx = (S-1)/2 + 1; % Index corresponding to zero shift
     norm_y = norm(self.Y(:,:,s_idx),'fro')^2;
     norm_y = gather(double(norm_y));

@@ -3,16 +3,16 @@ function [basis_new, spk_new] = update_spkbasis(basis, src, varargin)
 %   [basis, spk] = update_spkbasis(basis, src, ...)
 %
 % Returns:
-%   basis       New SpikeBasisCS with updated basis waveforms
+%   basis       New SpikeBasis with updated basis waveforms
 %   spk         Detected spikes (Spikes object)
 % Required arguments:
-%   basis       Original spike basis waveforms (SpikeBasisCS object)
+%   basis       Original spike basis waveforms (SpikeBasis object)
 %   data        [Inf x C] DataSrc object to read raw data from
 % Optional parameters (key/value pairs) [default]:
 %   solver      Solver object to detect spikes with         [ auto ]
 %   optimizer   SpikeOptimizer object to use                [ auto ]
 %   reg_wt      Relative weight on proximal regularizer     [ 0.1 ]
-%   K_add       Number of basis waveforms to add            [ 0 ]
+%   D_add       Number of basis waveforms to add            [ 0 ]
 %   batch_size  Size (#samples) of each batch               [ 256k ]
 %   n_batch     Number of randomly-selected batches         [ 32 ]
 %   verbose     Print status updates to stdout              [ false ]
@@ -25,8 +25,11 @@ function [basis_new, spk_new] = update_spkbasis(basis, src, varargin)
 % in the optimization that penalizes large changes in the spike basis. Using
 % this, update_spkbasis() can be used to implement stochastic gradient descent.
 %
-% K_add can be used to increase the number of basis waveforms. This may produce
-% more stable results than simply calling init_spkbasis() with a larger K.
+% D_add can be used to increase the number of basis waveforms. This may produce
+% more stable results than simply calling init_spkbasis() with a larger D.
+%
+% If the given basis is a SpikeBasisCS (a subclass of SpikeBasis with channel-
+% specific basis waveforms), then the output basis will also be a SpikeBasisCS.
 
 %% Deal with inputs
 
@@ -39,7 +42,7 @@ isemptyora = @(x,class) isempty(x) || isa(x,class);
 ip.addParameter('solver',    [], @(x) isemptyora(x,'spkdec.Solver'));
 ip.addParameter('optimizer', [], @(x) isemptyora(x,'spkdec.SpikeOptimizer'));
 ip.addParameter('reg_wt',         0.1, @isscalar);
-ip.addParameter('K_add',            0, @isscalar);
+ip.addParameter('D_add',            0, @isscalar);
 ip.addParameter('batch_size',256*1024, @isscalar);
 ip.addParameter('n_batch',         32, @isscalar);
 ip.addParameter('verbose',      false, @isscalar);
@@ -129,6 +132,6 @@ end
 if verbose, fprintf('Optimizing spike basis waveforms...\n'); end
 
 [basis_new, spk_new] = optimizer.updateBasis(basis, spk_all, resid_all, ...
-    'reg_wt',prm.reg_wt, 'K_add',prm.K_add);
+    'reg_wt',prm.reg_wt, 'D_add',prm.D_add);
 
 end

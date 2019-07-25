@@ -3,62 +3,79 @@ function [basis_obj, spk_new] = updateBasis(self, basis, spk, resid, varargin)
 %   [basis_new, spk_new] = updateBasis(self, basis, spk, resid, ...)
 %
 % Returns:
-%   basis_new   New SpikeBasisCS with updated basis waveforms
+%   basis_new   New SpikeBasis with updated basis waveforms
 %   spk_new     Detected spikes (Spikes object) after optimization
 % Required arguments:
-%   basis       SpikeBasisCS object
+%   basis       SpikeBasis object
 %   spk         Detected spikes (Spikes object)
 %   resid       [L+W-1 x C x N] spike residuals (whitened)
 % Optional parameters (key/value pairs) [default]:
 %   lambda      Regularizer param in optimize()             [defer to reg_wt]
 %   reg_wt      Relative weight to put on regularizer       [ 0.1 ]
-%   K_add       Basis waveforms to add to each channel      [ 0 ]
+%   D_add       Number of basis waveforms to add            [ 0 ]
 %
 % This calls self.optimize() to solve the following optimization problem:
 %       minimize    ||Y - basis.reconst(X)||^2 + lambda*||basis-basis_old||^2
-%     subject to    basis is channel-specific and channelwise orthonormal
+%     subject to    basis is orthonormal
 % where the norms are defined in terms of the whitened inner product, and Y is
-% the spike waveforms (Y = basis_old.reconst(spk_old)).
+% the spike waveforms (Y = basis_old.reconst(spk_old) + resid). If `basis` is
+% channel-specific (i.e. a SpikeBasisCS object), then the constraint is instead
+% "basis is channel-specific and channelwise orthonormal".
 %
 % By default, this sets lambda = reg_wt * ||spikes||^2/||basis||^2, but this can
 % be overridden by explicitly specifying the <lambda> parameter.
 %
-% If K_add > 0, then ihis initializes the new basis waveforms using a singular
+% If D_add > 0, then ihis initializes the new basis waveforms using a singular
 % value decomposition (SVD) of the given residual.
 
 % Optional params
 ip = inputParser();
 ip.addParameter('lambda', [], @(x) isempty(x) || isscalar(x));
 ip.addParameter('reg_wt', 0.1, @isscalar);
-ip.addParameter('K_add', 1, @isscalar);
+ip.addParameter('D_add', 0, @isscalar);
 ip.parse( varargin{:} );
 prm = ip.Results;
 
+% Determine the basis mode
+if isa(basis,'spkdec.SpikeBasisCS')
+    basis_mode = 'channel-specific';
+    assert(mod(prm.D_add,self.C)==0, self.errid_arg, ...
+        'In the "channel-specific" basis mode, D_add must be divisible by C');
+else
+    basis_mode = 'omni-channel';
+end
+
 % Reconstruct the spike waveforms (also performs input checks)
 spikes = self.reconstruct_spikes(basis, spk, resid);
-basis_old = basis.basis_cs;
+% Convert the residual into Q1 coordinates
+resid_Q1 = transform_residual(self, resid, spk.r);
 
 % Define lambda if necessary
 lambda = prm.lambda;
 if isempty(lambda)
     % Use reg_wt to define lambda
     spk_norm = compute_spike_norm(self, spikes);
-    basis_norm = compute_basis_norm(self, basis_old);
+    basis_norm = compute_basis_norm(self, basis.basis);
     lambda = prm.reg_wt * spk_norm^2/basis_norm^2;
 end
 
-% Expand the basis if desired
-if prm.K_add > 0
-    basis_svd = init_basis_svd(self, resid, spk.r, prm.K_add);
-    basis_old = cat(2, basis_old, basis_svd); % [L x K+K_add x C]
+% Expand the basis, call optimize(), and construct the SpikeBasis object
+switch basis_mode
+    case 'channel-specific'
+        bcs_old = expand_basis_cs(self, basis.basis_cs, resid_Q1, prm.D_add);
+        [bcs_new, spk_new] = self.optimizeCS(spikes, ...
+            'lambda',lambda, 'basis_prev',bcs_old);
+        basis_obj = basis.copy_modifyCS(bcs_new);
+        
+    case 'omni-channel'
+        basis_old = expand_basis(self, basis.basis, resid_Q1, prm.D_add);
+        [basis_new, spk_new] = self.optimize(spikes, ...
+            'lambda',lambda, 'basis_prev',basis_old);
+        basis_obj = basis.copy_modify(basis_new);
+        
+    otherwise
+        error(self.errid_arg, 'Unsupported basis mode "%s"',basis_mode);
 end
-
-% Call optimize()
-[basis_new, spk_new] = self.optimize(spikes, ...
-    'lambda',lambda, 'basis_prev',basis_old);
-
-% Construct the SpikeBasis object
-basis_obj = basis.copy_modifyCS(basis_new);
 
 % spk_new.t is currently spike offsets, so add these to the original spk.t
 spk_new.shiftTimes(spk.t);
@@ -96,33 +113,22 @@ function basis_norm = compute_basis_norm(self, basis)
 % Returns:
 %   basis_norm  Norm of the given spike basis (whitened)
 % Required arguments
-%   basis       [L x K x C] basis waveforms (raw)
-
-% Since the basis is channel-specific (i.e. we can think of it as a [L*C x K*C]
-% block diagonal matrix with C [L x K] blocks), we can measure its norm in
-% either the Q1 or Q2 bases; they will produce equivalent results. So we'll use
-% the Q2 basis; it's a little easier. wh_02 whitens the raw waveforms and
-% expresses it in Q2 coordinates.
-wh_02 = self.whbasis.wh_02;
-basis_norm_sq = 0;
-for c = 1:self.C
-    basis_Q2_c = wh_02(:,:,c) * basis(:,:,c);
-    basis_norm_sq = basis_norm_sq + norm(basis_Q2_c,'fro')^2;
-end
-basis_norm = sqrt(basis_norm_sq);
+%   basis       [L x C x D] spike basis waveforms (non-whitened)
+[L,C,D] = size(basis);
+basis_Q1 = self.whbasis.wh_01(:,:) * reshape(basis,[L*C,D]);
+basis_norm = norm(basis_Q1(:));
 end
 
 
-function basis_new = init_basis_svd(self, resid, spk_r, K_add)
-% Initialize new basis components by performing a SVD of the residual
-%   basis_new = init_basis_svd(self, resid, spk_r, K_add)
+function resid_Q1 = transform_residual(self, resid, spk_r)
+% Transform the given residuals into Q1 coordinates
+%   resid_Q1 = transform_residual(self, resid, spk_r)
 %
 % Returns:
-%   basis_new   [L x K_add x C] new basis waveforms (raw)
+%   resid_Q1    [L x C x N] unshifted spike residuals in Q1 coordinates
 % Required arguments:
-%   resid       [Lw x C x N] spike residuals (whitened waveforms)
+%   resid       [Lw x C x N] whitened spike residuals
 %   spk_r       [N x 1] detected sub-sample shift (1..R) to remove
-%   K_add       Number of new basis waveforms to initialize
 whbasis = self.whbasis;
 % Remove the sub-sample shift from the residuals (which requires unwhitening)
 resid_unwh = whbasis.unwhiten(resid);           % [L x C x N] unwhitened
@@ -131,10 +137,65 @@ resid_unwh = whbasis.interp.shiftArr(resid_unwh, spk_r, true);
 resid_unwh = reshape(resid_unwh, [L*C, N]);     % [L*C x N] unwh + unshifted
 % Re-whiten the residuals and transform them into Q1 coordinates
 resid_Q1 = whbasis.wh_01(:,:) * resid_unwh;     % [L*C x N] in Q1 basis
-% Perform the SVD in Q2 coordinates (a channelwise-whitened space)
-% We can reuse some optimize() helper functions
-self.Y = resid_Q1;                              % [L*C x N] in Q1 basis
-A = self.init_spkbasis(K_add);                  % [L x K_add x C] in Q2 basis
-basis_new = self.convert_A_to_spkbasis(A);      % [L x K_add x C] non-whitened
-self.Y = [];
+end
+
+
+function basis_cs = expand_basis_cs(self, basis_cs, resid_Q1, D_add)
+% Expand the given channel-specific basis by performing a SVD of the residual
+%   basis_cs = expand_basis_cs(self, basis_cs, resid_Q1, D_add)
+%
+% Returns:
+%   basis_cs    [L x K+D_add/C x C] expanded basis waveforms (raw)
+% Required arguments:
+%   basis_cs    [L x K x C] basis waveforms (raw)
+%   resid_Q1    [L*C x N] spike residuals (whitened, Q1 coordinates)
+%   D_add       Number of basis waveforms to add (divisible by C)
+if D_add==0, return; end
+% Convert the given basis into Q2 coordinates (a channelwise-whitened space)
+[L,K,C] = size(basis_cs);
+A_old = zeros(L,K,C);
+for c = 1:C
+    A_old(:,:,c) = self.whbasis.wh_02(:,:,c) * basis_cs(:,:,c);
+end
+% Perform the SVD of the residual in these Q2 coordinates as well
+self.Y = resid_Q1;
+self.basis_mode = 'channel-specific';
+A_new = self.init_spkbasis(D_add);
+% Append and enforce channelwise orthonormality
+A = cat(2, A_old, A_new);
+for c = 1:C
+    [U,~,V] = svd(A(:,:,c), 'econ');
+    A(:,:,c) = U * V';
+end
+% Convert back to the non-whitened space and cleanup
+basis_cs = self.convert_A_to_spkbasis(A);
+self.Y = []; self.basis_mode = [];
+end
+
+
+function basis = expand_basis(self, basis, resid_Q1, D_add)
+% Expand the given basis by performing a SVD of the residual
+%   basis = expand_basis(self, basis, resid_Q1, D_add)
+%
+% Returns:
+%   basis       [L x C x D+D_add] expanded basis waveforms (raw)
+% Required arguments:
+%   basis       [L x C x D] basis waveforms (raw)
+%   resid_Q1    [L*C x N] spike residuals (whitened, Q1 coordinates)
+%   D_add       Number of basis waveforms to add
+if D_add==0, return; end
+% Convert the given basis into Q1 coordinates (a whitened space)
+[L,C,D] = size(basis);
+A_old = self.whbasis.wh_01(:,:) * reshape(basis,[L*C,D]);
+% Perform the SVD of the residual in these Q1 coordinates as well
+self.Y = resid_Q1;
+self.basis_mode = 'omni-channel';
+A_new = self.init_spkbasis(D_add);
+% Append and enforce orthonormality
+A = [A_old, A_new];
+[U,~,V] = svd(A, 'econ');
+A = U * V';
+% Convert back to non-whitened space and cleanup
+basis = self.convert_A_to_spkbasis(A);
+self.Y = []; self.basis_mode = [];
 end

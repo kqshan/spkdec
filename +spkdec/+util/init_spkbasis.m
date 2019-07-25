@@ -1,15 +1,16 @@
-function [basis, spk] = init_spkbasis(optimizer, src, K, varargin)
+function [basis, spk] = init_spkbasis(optimizer, src, D, varargin)
 % Initialize a spike basis by detecting threshold-crossings in whitened data
-%   [basis, spk] = init_spkbasis(optimizer, src, K, ... )
+%   [basis, spk] = init_spkbasis(optimizer, src, D, ... )
 %
 % Returns:
-%   basis       New SpikeBasisCS object
+%   basis       New SpikeBasis object
 %   spk         Detected spikes (Spikes object) where t is a shift in spike time
 % Required arguments:
 %   optimizer   SpikeOptimizer object used to optimize the spike basis
 %   data        [Inf x C] DataSrc object to read raw data from
-%   K           Number of spike basis waveforms per channel
+%   D           Number of spike basis waveforms overall
 % Parameters (key/value pairs) [default]:
+%   basis_mode  Spike basis mode: {'channel-specific',['omni-channel']}
 %   t0          Sample index (1..L) corresponding to t=0    [ 1 ]
 %   det_quant   Spike detection quantile                    [ 0.995 ]
 %   det_val     Spike detection threshold                   [use det_quant]
@@ -24,6 +25,9 @@ function [basis, spk] = init_spkbasis(optimizer, src, K, varargin)
 % Spikes are then extracted using <t0> to align the spike window to the detected
 % peak, and the spike basis is initialized to minimize the reconstruction error
 % on these detected spikes.
+%
+% If basis_mode=='channel-specific', then `basis` will be a SpikeBasisCS (a
+% subclass of SpikeBasis with channel-specific basis waveforms).
 
 
 %% Deal with inputs
@@ -33,6 +37,7 @@ errid_arg = 'spkdec:util:init_spkbasis:BadArg';
 
 % Optional parameters
 ip = inputParser();
+ip.addParameter('basis_mode', 'omni-channel', @ischar);
 ip.addParameter('t0', 1, @isscalar);
 ip.addParameter('det_quant', 0.995, @isscalar);
 ip.addParameter('det_val', [], @(x) isempty(x) || isscalar(x));
@@ -117,6 +122,7 @@ if verbose, fprintf('%d spikes detected\n',N); end
 
 %% Initialize the basis waveforms
 
-[basis, spk] = optimizer.makeBasis(spikes, K, 't0',t0);
+[basis, spk] = optimizer.makeBasis(spikes, D, ...
+    't0',t0, 'basis_mode',prm.basis_mode);
 
 end

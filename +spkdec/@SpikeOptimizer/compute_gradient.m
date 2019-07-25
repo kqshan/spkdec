@@ -3,44 +3,53 @@ function grad = compute_gradient(self, A, X)
 %   grad = compute_gradient(self, A, X)
 %
 % Returns:
-%   grad    [L x K x C] gradient with respect to A (in block diagonal format)
+%   grad    Gradient with respect to A (same format as A)
 % Required arguments:
-%   A       [L x K x C] whitened spike basis waveforms in Q2 coordinates
+%   A       Whitened spike basis. Format depends on self.basis_mode:
+%             channel-specific - [L x K x C] in Q2 coordinates
+%             omni-channel     - [L*C x D] in Q1 coordinates
 %   X       Output struct from optimize_spk()
 
 % Dimensions and local variables
+[LC,D,R] = size(X.ErrXt);
 C = self.C;
-R = self.R;
 whbasis = self.whbasis;
 
 % Our objective function is
-%   f(A) = 1/2*||map_21*A*X - Y||^2 + lambda/2*||map_21*(A-A0)||^2
+%   f(A) = 1/2*||map_21*A*X - Y||^2 + lambda/2*||A - A0||^2
 % and so the gradient is
-%   grad = map_21'*(map_21*A*X-Y)*X' + lambda*map_21'*map_21*(A-A0)
+%   grad = map_21'*(map_21*A*X-Y)*X' + lambda*(A-A0)
+% We've already computed ErrXt = (map_21*A*X - Y)*X', so this comes out to:
+%   grad = map_21'*ErrXt + lambda*(A-A0)
 %
-% A couple simplifications that we can apply:
-% * We've already computed ErrXt = (map_21*A*X - Y) * X' in optimize_spk()
-% * The gradient may be [L*C x K*C], but we only care about the C [L x K] blocks
-%   along its diagonal. Within these blocks, map_21'*map_21 == I (due to how the
-%   Q1 and Q2 bases were constructed).
-%
-% So that brings us to:
-%   grad(:,:,c) = map_21(:,:,c)'*ErrXt(:,:,c) + lambda*(A(:,:,c) - A0(:,:,c)
-
-% One complication is that we actually have a different map_21r for each
-% sub-sample shift index. We're actually not going to use these shift operators
-% in the regularizer term, though, so that part stays as just lambda*(A-A0).
+% This is slightly complicated by the fact that we have a different map_21r (and
+% a different ErrXt) for each sub-sample shift index, which we will sum over.
 
 % Start with just the regularizer term
 grad = self.lambda * (A - self.A0);
 
 % Add in the gradient of the error term
-for c = 1:C
-    grad_c = grad(:,:,c);
-    for r = 1:R
-        grad_c = grad_c + whbasis.map_21r(:,:,c,r)' * X.ErrXt(:,:,c,r);
-    end
-    grad(:,:,c) = grad_c;
+switch self.basis_mode
+    case 'channel-specific'
+        % We can do this independently for each channel since we don't care
+        % about the off-diagonal blocks
+        K = D/C;
+        ErrXt = reshape(X.ErrXt, [LC, K, C, R]);
+        for c = 1:C
+            for r = 1:R
+                grad_cr = whbasis.map_21r(:,:,c,r)' * ErrXt(:,:,c,r);
+                grad(:,:,c) = grad(:,:,c) + grad_cr;
+            end
+        end
+        
+    case 'omni-channel'
+        % In this case, we have shift1r instead of map_21r.
+        for r = 1:R
+            grad = grad + whbasis.shift1r(:,:,r)'*X.ErrXt(:,:,r);
+        end
+        
+    otherwise
+        error(self.errid_arg, 'Unsupported basis_mode "%s"',self.basis_mode);
 end
 
 end

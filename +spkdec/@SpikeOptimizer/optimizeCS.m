@@ -1,9 +1,9 @@
-function [basis, spk, resid] = optimize(self, data, varargin)
-% Find a spike waveform basis that minimizes the reconstruction error
-%   [basis, spk, resid] = optimize(self, data, ...)
+function [basis_cs, spk, resid] = optimizeCS(self, data, varargin)
+% Find a channel-specific spike basis that minimizes the reconstruction error
+%   [basis_cs, spk, resid] = optimizeCS(self, data, ...)
 %
 % Returns:
-%   basis       [L x C x D] optimized spike basis waveforms
+%   basis_cs    [L x K x C] optimized channel-specific spike basis waveforms
 %   spk         Spikes object (where t is the shift in detected spike time)
 %   resid       [L+W-1 x C x N] spike residuals (whitened) after optimization
 % Required arguments:
@@ -11,13 +11,13 @@ function [basis, spk, resid] = optimize(self, data, varargin)
 % Optional parameters (key/value pairs) [default]:
 %   lambda      Proximal regularizer weight                 [ 0 ]
 %   basis_prev  Previous basis (for proximal regularizer)   [ none ]
-%   D           Number of basis waveforms overall         [defer to basis_prev]
+%   K           Number of basis waveforms per channel     [defer to basis_prev]
 %   zero_pad    [pre,post] #samples of zero-padding to add  [ 0,0 ]
 %   spk_r       [N x 1] sub-sample shift for each spike     [ auto ]
 %
-% This finds the basis waveforms and spike features to solve:
+% This finds the basis waveforms and spike fetaures to solve:
 %     minimize    ||data - basis*spk.X||^2 + lambda*||basis-basis_prev||^2
-%   subject to    basis is orthonormal
+%   subject to    basis is channel-specific and channelwise orthonormal
 % where the norms are defined in terms of the whitened inner product.
 %
 % If self.dt_search > 0 and/or self.whbasis.R > 1 (unless `spk_r` is given),
@@ -32,12 +32,13 @@ function [basis, spk, resid] = optimize(self, data, varargin)
 % reshaping some of our data:
 %   data        [(L+W-1)*C x N] observed whitened spike waveforms
 %   wh_00       [(L+W-1)*C x L*C] whitening operation (self.whbasis.wh_00)
-%   basis       [L*C x D] spike basis waveforms
-%   basis_prev  [L*C x D] previous basis for the regularizer
-%   X           [D x N] spikes in feature space
+%   basis       [L*C x K*C] spike basis waveforms (block diagonal with C [L x K]
+%               blocks, since waveforms are channel-specific)
+%   basis_prev  [L*C x K*C] previous basis for the regularizer
+%   X           [K*C x N] spikes in feature space
 % Then we can pose the original problem as:
 %     minimize  ||data-wh_00*basis*X||^2 + lambda*||wh_00*(basis-basis_prev)||^2
-%   subject to  basis is orthonormal
+%   subject to  basis is block diagonal and channelwise orthonormal
 
 
 % Next, let's see how a change of variables can help us restate this problem.
@@ -46,16 +47,37 @@ function [basis, spk, resid] = optimize(self, data, varargin)
 % whitener, which means that the component of <data> that is orthogonal to Q1 is
 % forever out of the reach of this optimization. Let's introduce
 %   Y       [L*C x N] observed waveforms in Q1 coordinates: Y = Q1' * data
-%   A       [L*C x D] whitened spike basis in Q1 coordinates: A = wh_01 * basis
-%   A0      [L*C x D] whitened previous basis in Q1 coordinates
 % And since wh_00 == Q1 * wh_01 and Q1'*Q1 == I, our problem is equivalent to:
-%     minimize  ||Y - A*X||^2 + lambda*||A - A0||^2
-%   subject to  basis is orthonormal
+%     minimize  ||Y - wh_01*basis*X||^2 + lambda*||wh_01*(basis-basis_prev)||^2
+%   subject to  basis is block diagonal and channelwise orthonormal
+%
+% whbasis.Q2 is another L*C dimensional basis for the whitener span, except Q2
+% is channelwise orthonormal. So if we introduce
+%   A       [L*C x K*C] whitened spike basis waveforms in Q2 basis
+% then "basis is block diagonal and channelwise orthonormal" is equivalent to
+% "A is block diagonal with orthonormal blocks". Since wh_00 == Q2 * wh_02, we
+% can then introduce
+%   A0      [L*C x K*C] whitened previous basis in Q2 coordinates:
+%           A0 = wh_02 * basis_prev
+% whbasis.map_21 defines as map so that wh_01 == map_21 * wh_02, which allows us
+% to rewrite our problem as
+%     minimize  ||Y - map_21*A*X||^2 + lambda*||map_21*(A - A0)||^2
+%   subject to  A is block diagonal with orthonormal blocks
+%
+% We can simplify this one step further if we assume that (A-A0) is block
+% diagonal. Since Q1 is orthonormal and Q2 is channelwise orthonormal, the
+% C [L x L] blocks along the diagonal of map_21'*map_21 are all [L x L] identity
+% matrices. If (A-A0) is block diagonal, then the off-diagonal terms are
+% irrelevant since they correspond to zeros in (A-A0) and thus
+%   ||map_21*(A-A0)|| == ||A-A0||
+% and so, as long as A0 is block diagonal, our problem simplifies to
+%     minimize  ||Y - map_21*A*X||^2 + lambda*||A - A0||^2
+%   subject to  A is block diagonal with orthonormal blocks
 
 
 % So that's the problem that we are solving here. We first convert the given
-% data (<data> and basis_prev) into these Q1 coordinates (Y and A0), solve for
-% A, then find <basis> such that A == wh_01 * basis.
+% data (<data> and basis_prev) into these Q1/Q2 coordinates (Y and A0), solve
+% for A, then find <basis> such that A == wh_02 * basis.
 
 
 % We perform this minimization using alternating descent. Ideally, each
@@ -104,7 +126,7 @@ self.t_start = tic();
 ip = inputParser();
 ip.addParameter('lambda', 0, @isscalar);
 ip.addParameter('basis_prev', []);
-ip.addParameter('D', [], @(x) isempty(x) || isscalar(x));
+ip.addParameter('K', [], @(x) isempty(x) || isscalar(x));
 ip.addParameter('zero_pad', [0 0], @(x) numel(x)==2);
 ip.addParameter('spk_r', [], @(x) isempty(x) || numel(x)==size(data,3));
 ip.parse( varargin{:} );
@@ -113,24 +135,29 @@ prm = ip.Results;
 % Convert the given spikes into Q1 coordinates
 self.Y = self.convert_spikes_to_Y(data, prm.zero_pad);
 
-% Put ourselves into omni-channel (each waveform spans all channels) mode
-self.basis_mode = 'omni-channel';
+% Put ourselves into channel-specific mode
+% In this mode, we will only be storing the C [L x K] diagonal blocks of A and
+% A0, since the rest must be zero. So A will be [L x K x C] instead of [L*C x D]
+self.basis_mode = 'channel-specific';
 
 % Get a starting spike basis
 L = self.L; C = self.C;
 if isempty(prm.basis_prev)
     assert(prm.lambda==0, self.errid_arg, ...
         'basis_prev must be specified if lambda ~= 0');
-    assert(~isempty(prm.D), self.errid_arg, ...
-        'D must be specified if basis_prev is not given');
+    assert(~isempty(prm.K), self.errid_arg, ...
+        'K must be specified if basis_prev is not given');
     % Initialize this based on the data
-    A = self.init_spkbasis(prm.D);
+    A = self.init_spkbasis(prm.K*C);
 else
-    [L_, C_, D] = size(prm.basis_prev);
+    [L_, K, C_] = size(prm.basis_prev);
     assert(L_==L && C_==C, self.errid_dim, ...
-        'basis_prev must be [L x C x D] with L=%d and C=%d',L,C);
+        'basis_prev must be [L x K x C] with L=%d and C=%d',L,self.C);
     % Convert the given spike basis
-    A = self.whbasis.wh_01(:,:) * reshape(prm.basis_prev, [L*C, D]);
+    A = zeros(L, K, C);
+    for c = 1:C
+        A(:,:,c) = self.whbasis.wh_02(:,:,c) * prm.basis_prev(:,:,c);
+    end
 end
 % Store this (and lambda) in our object-level cache
 self.A0 = A;
@@ -184,7 +211,7 @@ end
 
 
 % Convert the basis back into raw waveforms
-basis = self.convert_A_to_spkbasis(A);
+basis_cs = self.convert_A_to_spkbasis(A);
 
 % Construct the Spikes object
 spk_t = X.s - (self.dt_search+1);

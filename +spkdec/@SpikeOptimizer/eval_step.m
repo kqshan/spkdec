@@ -5,17 +5,16 @@ function step_ok = eval_step(self, A, prev_A, X)
 % Returns:
 %   step_ok   Whether this satisfies the backtracking termination criterion
 % Required arguments:
-%   A         [L x K x C] new value of the whitened spike basis waveforms
-%   prev_A    [L x K x C] previous value of the whitened spike basis waveforms
+%   A         New value of the whitened spike basis waveforms
+%   prev_A    Previous value of the whitened spike basis waveforms
 %   X         Output struct from optimize_spk()
+%
+% The format of `A` and `prev_A` depend on self.basis_mode:
+%   channel-specific - [L x K x C] in Q2 coordinates
+%   omni-channel     - [L*C x D] in Q1 coordinates
 %
 % This uses self.lip (local Lipschitz estimate) and expects it to be the same
 % value as when we called A = prox_grad_step(prev_A, grad)
-
-% Dimensions
-[L, K, C] = size(A);
-R = self.R;
-whbasis = self.whbasis;
 
 % In general, if we can write our objective function as
 %   phi(x) = f(x) + g(x)
@@ -57,13 +56,9 @@ rhs = (self.lip - self.lambda) * sum(delta_A.^2, 'all');
 % * Since we have multiple sub-sample shifts, we need to use a different
 %   map_21r for each of these shifts.
 lhs = 0;
-for r = 1:R
+for r = 1:self.R
     % Compute delta_A2r = map_21r(:,:,r) * delta_A
-    delta_A2r = zeros(L*C, K, C);
-    for c = 1:C
-        delta_A2r(:,:,c) = whbasis.map_21r(:,:,c,r) * delta_A(:,:,c);
-    end
-    delta_A2r = reshape(delta_A2r,[L*C, K*C]);
+    delta_A2r = self.get_shifted_basis(delta_A, r);
     % Add this to the rest
     lhs = lhs + sum((delta_A2r*X.X_cov(:,:,r)).^2, 'all');
 end

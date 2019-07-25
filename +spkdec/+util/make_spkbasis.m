@@ -1,18 +1,19 @@
 function basis = make_spkbasis(src, whitener, varargin)
-% Create a SpikeBasisCS object for spike detection in the given source
+% Create a SpikeBasis object for spike detection in the given source
 %   basis = make_spkbasis(src, ...)
 %
 % Returns:
-%   basis       SpikeBasisCS object fitted to the given source
+%   basis       SpikeBasis object fitted to the given source
 % Required arguments:
 %   src         [Inf x C] DataSrc object to read raw data from
 %   whitener    Whitener object for measuring approximation error
 % Optional parameters (key/value pairs) [default]:
 %   solver      Solver object or params for construction        [ auto ]
 %   optimizer   SpikeOptimizer or params for construction       [ auto ]
+%   basis_mode  Spike basis mode: {'channel-specific',['omni-channel']}
 %   n_iter      Number of gradient descent iterations           [ 12 ]
 %   make_ind    Rotate basis so features are independent        [ true ]
-%   K           Number of spike basis waveforms per channel     [ 3 ]
+%   D           Number of spike basis waveforms                 [ 8 ]
 %   R           Sub-sample interpolation ratio (1 = no interp)  [ 3 ]
 %   L           Spike basis length (#samples)                   [ 25 ]
 %   t0          Sample index (1..L) of spike center (t=0)       [ 9 ]
@@ -23,6 +24,9 @@ function basis = make_spkbasis(src, whitener, varargin)
 % This initializes the spike basis waveforms using spkdec.util.init_spkbasis,
 % then performs stochastic gradient descent using spkdec.util.update_spkbasis.
 %
+% If basis_mode=='channel-specific', then `basis` will be a SpikeBasisCS (a
+% subclass of SpikeBasis with channel-specific basis waveforms).
+%
 % See also: spkdec.util.init_spkbasis, spkdec.util.update_spkbasis
 
 %% Deal with inputs
@@ -32,9 +36,11 @@ ip = inputParser();
 is_s_ora = @(x,class) isstruct(x) || isa(x,class);
 ip.addParameter('solver',    struct(), @(x) is_s_ora(x,'spkdec.Solver'));
 ip.addParameter('optimizer', struct(), @(x) is_s_ora(x,'spkdec.SpikeOptimizer'));
+ip.addParameter('basis_mode', 'omni-channel', @ischar);
 ip.addParameter('n_iter',     12, @isscalar);
 ip.addParameter('make_ind', true, @isscalar);
-ip.addParameter('K',  3, @isscalar);
+ip.addParameter('K',NaN, @isscalar); % Deprecated parameter
+ip.addParameter('D',  8, @isscalar);
 ip.addParameter('R',  3, @isscalar);
 ip.addParameter('L', 25, @isscalar);
 ip.addParameter('t0', 9, @isscalar);
@@ -43,6 +49,18 @@ ip.addParameter('n_batch',           8, @isscalar);
 ip.addParameter('verbose',       false, @isscalar);
 ip.parse( varargin{:} );
 prm = ip.Results;
+
+% Special handling for this now-deprecated 'K' parameter
+if ~isnan(prm.K)
+    warning('The "K" parameter is deprecated and should not be used');
+    % The old behavior was to default to a basis_mode='channel-specific'
+    if ismember('basis_mode',ip.UsingDefaults)
+        prm.basis_mode = 'channel-specific';
+    end
+    assert(ismember('D',ip.UsingDefaults), ...
+        'The "K" and "D" parameter cannot both be given');
+    prm.D = prm.K * whitener.C;
+end
 
 % Default optimizer
 optimizer = prm.optimizer;
@@ -76,36 +94,55 @@ batch_prm = rmfield(prm, setdiff(fieldnames(prm),{'batch_size','n_batch'}));
 ibatch_prm = batch_prm;
 ibatch_prm.n_batch = batch_prm.n_batch * init_batch_mult;
 
+% Let's get some other dimensions and parameters
+C = optimizer.C;
+basis_mode = prm.basis_mode;
+
 % Rather than initialize them all at once, it seems to be better if we add the
-% waveforms one at a time. So let's start with K = 1
-[basis, spk] = spkdec.util.init_spkbasis(optimizer, src, 1, ...
-    't0',prm.t0, ibatch_prm);
+% waveforms a few at a time. Let's determine the schedule.
+D_tgt = prm.D;
+if strcmp(basis_mode, 'channel-specific')
+    % D must always be a multiple of C
+    assert(mod(D_tgt,C)==0, ...
+        'In the "channel-specific" basis_mode, D must be divisible by C');
+    K_tgt = D_tgt/C;
+    D_start = C;
+    D_sched = (2:K_tgt)' * C;
+else
+    % Start with (at most) C waveforms, then step up over (at most) 3 iterations
+    D_start = min(D_tgt, C);
+    n_iter = min(3, D_tgt-D_start);
+    D_sched = round((1:n_iter)' * (D_tgt-D_start)/n_iter) + D_start;
+end
+
+% Initialize using traditional spike detection
+[basis, spk] = spkdec.util.init_spkbasis(optimizer, src, D_start, ...
+    't0',prm.t0, 'basis_mode',basis_mode, ibatch_prm);
 % Report the results
 if verbose
-    fprintf(vb_fmt, toc(t_start), spk.N, spk.N/ibatch_prm.n_batch, ...
-        'Initialized to K=1 using PCA of traditionally-detected spikes');
+    note = sprintf(['Initialized to D=%d using ' ...
+        'traditionally-detected spikes'],basis.D);
+    fprintf(vb_fmt, toc(t_start), spk.N, spk.N/ibatch_prm.n_batch, note);
 end 
 
-% And then add on additional basis waveforms one by one
-for K = 2:prm.K
-    % Adjust the spike detection threshold because the K is different
+% And then add on additional basis waveforms
+for D_curr = D_sched'
+    % Adjust the spike detection threshold because the D is different
     % We'll set it so to maintain a constant false positive rate (under a
     % chi-squared distribution, an assumption that is definitely wrong).
-    D_tgt = prm.K * basis.C;
     det_thresh_tgt = solver.det_thresh;
     log_ccdf_tgt = log(chi2cdf(D_tgt*det_thresh_tgt, D_tgt, 'upper'));
-    D_curr = K * basis.C;
     det_thresh = fzero(@(x) ...
         log(chi2cdf(D_curr*x,D_curr,'upper')) - log_ccdf_tgt, det_thresh_tgt);
     solver2 = copy(solver);
     solver2.det_thresh = det_thresh;
     % Perform the update
     [basis, spk] = spkdec.util.update_spkbasis(basis, src, 'solver',solver2, ...
-        'optimizer',optimizer, 'reg_wt',0, 'K_add',1, ibatch_prm);
+        'optimizer',optimizer, 'reg_wt',0, 'D_add',D_curr-basis.D, ibatch_prm);
     % Report the results
     if verbose
-        note = sprintf(['Increased to K=%d using PCA of deconvolution-' ...
-            'detected spikes'],basis.K);
+        note = sprintf(['Increased to D=%d using deconvolution-' ...
+            'detected spikes'],basis.D);
         fprintf(vb_fmt, toc(t_start), spk.N, spk.N/ibatch_prm.n_batch, note);
     end
 end
@@ -131,38 +168,24 @@ end
 % waveforms within a channel, and it can be convenient to rotate them so that
 % the detected features (within a channel) are statistically independent.
 if prm.make_ind
-    % Separate out the features by channel
-    K = basis.K; C = basis.C; N = spk.N;
-    spk_X = reshape(spk.X, [K C N]);
-    spk_X = permute(spk_X, [1 3 2]); % [K x N x C]
-    spk_X = gather(double(spk_X));
-    % Perform the rotations on each channel independently
-    basis_new = basis.basis_cs; % [L x K x C]
-    for c = 1:C
-        % Reconstructed spikes = A*X = A*U*S*V'. Let us define
-        %       A2 = A * U      X2 = S * V'
-        % Then we still have A2*X2 == A*X, but now the rows of X2 are orthogonal
-        % and sorted in descending order of 2-norm.
-        [U,~,V] = svd(spk_X(:,:,c), 'econ');
-        A2 = basis.basis_cs(:,:,c) * U;
-        % For sign consistency, let's flip the sign of the first basis waveform
-        % so that its corresponding feature dimension is generally positive.
-        % Note that S > 0, so sign(X2) == sign(V').
-        A_sign = sign(median(V(:,1)));
-        if A_sign == 0, A_sign = 1; end
-        A2(:,1) = A2(:,1) * A_sign;
-        % And we'll set the signs of the remaining basis waveforms so that they
-        % have a positive dot product with the first basis waveform (they may be
-        % orthogonal in whitened space, but these dot products are in
-        % non-whitened space).
-        A_sign = sign(sum(A2 .* A2(:,1),1));
-        A_sign(A_sign==0) = 1;
-        A2 = A2 .* A_sign;
-        % Done with this channel
-        basis_new(:,:,c) = A2;
+    if isa(basis, 'spkdec.SpikeBasisCS')
+        % Do this per channel
+        K = basis.K; C = basis.C;
+        basis_cs = basis.basis_cs;
+        for c = 1:C
+            kk = (1:K)' + K*(c-1);
+            basis_cs(:,:,c) = rotate_basis_canonically( ...
+                basis_cs(:,:,c), spk.X(kk,:) );
+        end
+        basis = basis.copy_modifyCS(basis_cs);
+    else
+        % Do this for all the channels together
+        [L,C,D] = size(basis.basis);
+        basis_mat = reshape(basis.basis, [L*C, D]);
+        basis_mat = rotate_basis_canonically(basis_mat, spk.X);
+        basis_mat = reshape(basis_mat, [L C D]);
+        basis = basis.copy_modify(basis_mat);
     end
-    % Create a new SpikeBasis object with this rotated basis
-    basis = basis.copy_modifyCS(basis_new);
 end
 
 % Report the total elapsed time
@@ -170,4 +193,41 @@ if verbose
     fprintf('util.make_spkbasis() completed in %.1f sec\n',toc(t_start));
 end
 
+end
+
+
+% --------------------------     Helper functions     --------------------------
+
+
+function [B, Y] = rotate_basis_canonically(A,X)
+% Rotate the given basis so that the features obey some desired properties
+%   [B, Y] = rotate_basis_canonically(A,X)
+%
+% Returns:
+%   B       [L x D] rotated basis (B*Y == A*X)
+%   Y       [D x N] rotated features (rows of Y are orthogonal)
+% Required arguments:
+%   A       [L x D] basis
+%   X       [D x N] features
+%
+% Additionally, the rows of Y are sorted in order of decreasing norm, and the
+% signs of B and Y are flipped so that:
+% * Y(1,:) is generally positive
+% * The dot products of B(:,2:end) with B(1,:) are positive
+[U,~,~] = svd(gather(double(X*X')), 'econ');
+B = A * U;
+Y = U' * X;
+% Flip the sign of the first basis waveform so that its corresponding feature
+% dimension is generally positive
+sign_flip = sign(median(Y(1,:)));
+sign_flip = gather(double(sign_flip));
+if (sign_flip == 0), sign_flip = 1; end
+B(:,1) = B(:,1) * sign_flip;
+Y(1,:) = Y(1,:) * sign_flip;
+% Flip the sign of subsequent waveforms so that the have a positive dot product
+% with the first basis waveform
+sign_flip = sign(B' * B(:,1));
+sign_flip(sign_flip==0) = 1;
+B = B .* sign_flip';
+Y = Y .* sign_flip;
 end
