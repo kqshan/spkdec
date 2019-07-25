@@ -13,7 +13,7 @@ function x = pbsolve_m(A_bands, b)
 % performed in double-precision.
 
 % Construct the sparse matrix
-A = spkd.Math.symband_to_sparse(double(A_bands));
+A = spkdec.Math.symband_to_sparse(double(A_bands));
 
 % Perform the linear inverse
 x = A \ double(b);
