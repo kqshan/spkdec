@@ -20,6 +20,7 @@
 %   copy_modify - Create a copy with a modified basis
 %   copy_nonWh  - Create a copy of this basis without whitening
 % Data conversions
+%   plot        - Plot these spike basis waveforms
 %   toKern      - Return a matrix of the whitened basis waveforms
 %   toGram      - Return a Gramians object (dot products of the spike basis)
 %   toWhBasis   - Return a WhitenerBasis for this whitener and interp
@@ -171,6 +172,7 @@ methods
     basis_nonWh = copy_nonWh(self);
     
     % Data conversions
+    plot(self, varargin);
     kern = toKern(self, varargin);
     gram = toGram(self);
     whbasis = toWhBasis(self);
