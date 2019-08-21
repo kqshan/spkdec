@@ -64,7 +64,7 @@ switch basis_mode
         basis_cs = basis_cs .* reshape(sgn, [1, D/C, C]);
         basis_obj = spkdec.SpikeBasisCS(basis_cs, basis_prm);
     case 'omni-channel'
-        basis = basis .* sgn';
+        basis = basis .* shiftdim(sgn,-2);
         basis_obj = spkdec.SpikeBasis(basis, basis_prm);
 end
 
