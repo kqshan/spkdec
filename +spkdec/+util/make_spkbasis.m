@@ -12,6 +12,7 @@ function basis = make_spkbasis(src, whitener, varargin)
 %   optimizer   SpikeOptimizer or params for construction       [ auto ]
 %   basis_mode  Spike basis mode: {'channel-specific',['omni-channel']}
 %   n_iter      Number of gradient descent iterations           [ 12 ]
+%   D_start     # of spike basis waveforms for initialization   [ auto ]
 %   make_ind    Rotate basis so features are independent        [ true ]
 %   D           Number of spike basis waveforms                 [ 8 ]
 %   R           Sub-sample interpolation ratio (1 = no interp)  [ 3 ]
@@ -38,6 +39,7 @@ ip.addParameter('solver',    struct(), @(x) is_s_ora(x,'spkdec.Solver'));
 ip.addParameter('optimizer', struct(), @(x) is_s_ora(x,'spkdec.SpikeOptimizer'));
 ip.addParameter('basis_mode', 'omni-channel', @ischar);
 ip.addParameter('n_iter',     12, @isscalar);
+ip.addParameter('D_start',    [], @(x) isempty(x) || isscalar(x));
 ip.addParameter('make_ind', true, @isscalar);
 ip.addParameter('K',NaN, @isscalar); % Deprecated parameter
 ip.addParameter('D',  8, @isscalar);
@@ -101,16 +103,17 @@ basis_mode = prm.basis_mode;
 % Rather than initialize them all at once, it seems to be better if we add the
 % waveforms a few at a time. Let's determine the schedule.
 D_tgt = prm.D;
+D_start = prm.D_start;
 if strcmp(basis_mode, 'channel-specific')
     % D must always be a multiple of C
     assert(mod(D_tgt,C)==0, ...
         'In the "channel-specific" basis_mode, D must be divisible by C');
     K_tgt = D_tgt/C;
-    D_start = C;
+    if isempty(D_start), D_start = C; end
     D_sched = (2:K_tgt)' * C;
 else
     % Start with (at most) C waveforms, then step up over (at most) 3 iterations
-    D_start = min(D_tgt, C);
+    if isempty(D_start), D_start = min(D_tgt,C); end
     n_iter = min(3, D_tgt-D_start);
     D_sched = round((1:n_iter)' * (D_tgt-D_start)/n_iter) + D_start;
 end
