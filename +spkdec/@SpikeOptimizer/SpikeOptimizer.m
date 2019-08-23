@@ -256,7 +256,7 @@ methods (Access=protected)
         end
         L_max = norm_map21^2*norm_XXt + self.lambda;
         self.lip_max = L_max; self.lip_min = self.lambda;
-        self.lip = L_max/2; self.nBack = 0;
+        self.lip = (self.lip_max+self.lip_min)/2; self.nBack = 0;
     end
     
     function lipschitz_decay(self)
