@@ -106,6 +106,10 @@ for ii = 1:nBatch
     [spk, lims, resid] = solver.detect(basis, x, ...
         'trunc_1',true, 'trunc_2',true, 'residuals',{'spk'});
     
+    % Move to host memory
+    spk.setFeat(gather(spk.X));
+    resid = gather(resid);
+    
     % Store the results
     spk.shiftTimes(data_offset + spk_ctr_offset);
     spk_all{ii} = spk;
