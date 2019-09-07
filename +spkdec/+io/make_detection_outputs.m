@@ -22,17 +22,15 @@ function [outputs, sinks] = make_detection_outputs(basis, varargin)
 %   shuffle     Enable Shuffle filter                       [ true ]
 %   
 % The <sinks> struct is a nested struct that emulates the HDF5 file structure:
+%   version     File version string (currently '1.0')
 %   feature     Spike features
 %     dataset     [D x N] DataSink
 %     scaling     Scaling coefficient to apply when reading this dataset
-%     basis       [L x K x C] spike basis waveforms
-%     t0          Basis sample index (1..L) corresponding to t=0
 %   index       Spike source index (1..T) where detected
 %     dataset     [N] DataSink
 %   subidx      Spike sub-sample shift index (1..R)
 %     dataset     [N] DataSink
 %     R           Overall number of sub-sample shifts
-%     subshift    [L x L x R] sub-sample shift operators
 %   spknorm     Spike norm (in whitened space)
 %     dataset     [N] DataSink
 %   resid       Spike residuals (unwhitened)
@@ -40,6 +38,10 @@ function [outputs, sinks] = make_detection_outputs(basis, varargin)
 %     scaling     Scaling coefficient to apply when reading this dataset
 %   residnorm   Residual norms (in whitened space)
 %     dataset     [N] DataSink
+%   basis       Spike basis parameters
+%     waveforms   [L x C x D] spike basis waveforms
+%     t0          Basis sample index (1..L) corresponding to t=0
+%     subshift    [L x L x R] sub-sample shift operators
 %   whitener    Whitening parameters
 %     wh_filt     [W x C] whitening filters
 %     wh_ch       [C x C] cross-channel whitening operator
@@ -98,6 +100,10 @@ assert(isempty(filename) || exist(filename,'file')==0, ...
 h5_prm = struct('chunk_size',prm.chunk_size, ...
     'Shuffle',prm.shuffle, 'Deflate',prm.deflate);
 
+% Initialize the <sinks> struct with the file version
+sinks = struct('version','1.0');
+attnames_and_ndims = {'version',NaN};
+
 %% Construct the <outputs> struct
 
 % Get some dimensions
@@ -124,7 +130,6 @@ for name_dim = dataset_names_and_shapes'
 end
 
 % Copy these into the <sinks> struct
-sinks = struct();
 dataset_names = dataset_names_and_shapes(:,1);
 for name_cell = dataset_names'
     name = name_cell{1};
@@ -158,6 +163,7 @@ for name_cell = fieldnames(scaling_prm)'
             'scaling',write_scale);
     end
     sinks.(name).scaling = read_scale;
+    attnames_and_ndims(end+1,:) = {[name '.scaling'], 0}; %#ok<AGROW>
 end
 
 % Create the outputs struct
@@ -173,27 +179,41 @@ outputs.resid = spkdec.io.ResidSink( basis.toWhBasis(), ...
 %% Add the other attributes
 
 % Add them to the <sinks> struct
-sinks.feature.basis = basis.basis_cs;
-sinks.feature.t0 = basis.t0;
+sinks.basis = struct('waveforms',basis.basis, 't0',basis.t0, ...
+    'subshift',basis.interp.shifts);
 sinks.subidx.R = basis.R;
-sinks.subidx.subshift = basis.interp.shifts;
 sinks.whitener = basis.whitener.saveobj();
+attnames_and_ndims = [attnames_and_ndims; {
+    'subidx.R',0; 'basis.waveforms',3; 'basis.t0',0; 'basis.subshift',3; 
+    'whitener.wh_filt',2; 'whitener.wh_ch',2; 'whitener.delay',0;
+    }];
+groups_reqd = {'basis','whitener'};
 % detparams is optional
 detparams = struct();
 if ~isempty(prm.det_thresh)
     detparams.thresh = prm.det_thresh;
     detparams.norm = sqrt(D*detparams.thresh);
+    attnames_and_ndims(end+1,:) = {'detparams.thresh',0};
+    attnames_and_ndims(end+1,:) = {'detparams.norm',0};
 end
 if ~isempty(prm.det_refrac)
     detparams.refrac = prm.det_refrac;
+    attnames_and_ndims(end+1,:) = {'detparams.refrac',0};
 end
 if ~isempty(fieldnames(detparams))
     sinks.detparams = detparams;
+    groups_reqd{end+1} = 'detparams';
 end
 
 % Copy these to the HDF5 file
 if ~isempty(filename)
-    copy_struct_to_h5(sinks, filename, '/')
+    % Create the necessary groups
+    cellfun(@(group) create_h5_group(filename, ['/' group]), groups_reqd);
+    % Copy the attributes (some of which will be stored as small datasets)
+    for name_ndims = attnames_and_ndims'
+        [name, ndims] = deal(name_ndims{:});
+        copy_struct_to_h5(sinks, filename, name, ndims);
+    end
 end
 
 
@@ -203,50 +223,61 @@ end
 % -----------------------     Helper functions     -----------------------------
 
 
-function copy_struct_to_h5(S, file, loc)
-% Copy the struct contents as HDF5 attributes
-%   copy_struct_to_h5(S, file, loc)
+function copy_struct_to_h5(S, file, name, ndims)
+% Copy the struct contents as HDF5 datasets or attributes
+%   copy_struct_to_h5(S, file, name, ndims)
 %
 % Required arguments:
-%   S       Struct to copy. Fieldnames will become attribute names
+%   S       Struct to copy
 %   file    HDF5 filename
-%   loc     HDF5 location to attach this attribute to
+%   name    Struct fieldname (with '.' for sub-levels)
+%   ndims   Number of dimensions in the data
 %
-% This will ignore any fields named "dataset" and will recurse if it
-% encounters any nested structs.
-for fname_cell = fieldnames(S)'
-    fname = fname_cell{1};
-    % Skip any fields named 'dataset' (those aren't attributes)
-    if strcmp(fname,'dataset'), continue; end
-    % Read the value of this field
-    val = S.(fname);
-    % Write the attribute or recurse
-    if isstruct(val)
-        % Recurse
-        new_loc = [loc fname '/'];
-        create_group_if_necessary(file, new_loc);
-        copy_struct_to_h5(val, file, new_loc);
+% If ndims==0 or the data is a string (regardless of the value of `ndims`), then
+% the data will be stored as an attribute. Otherwise, the size of the data and
+% `ndims` are used to construct an appropriately-sized HDF5 dataset.
+
+% Traverse the struct tree to build the HDF5 location and get the value
+loc = '';
+val = S;
+for name_portion_cell = strsplit(name,'.')
+    name_portion = name_portion_cell{1};
+    val = val.(name_portion);
+    loc = [loc '/' name_portion]; %#ok<AGROW>
+end
+% Decide whether this should be a dataset or an attribute
+use_att = ischar(val) || (ndims==0);
+if use_att
+    % Use the last part of the location as the attribute name
+    idx = find(loc=='/', 1, 'last');
+    attname = loc(idx+1:end);
+    loc = loc(1:idx);
+    % Write the attribute
+    h5writeatt(file, loc, attname, val);
+else
+    % Determine the dataset dimensions
+    dims = size(val);
+    inferred_ndims = length(dims);
+    if inferred_ndims > ndims
+        assert(dims(ndims+1:end)==1, 'more dimensions than expected');
+        dims = dims(1:ndims);
     else
-        h5writeatt(file, loc, fname, val);
+        dims = [dims, ones(1,ndims-inferred_ndims)];
     end
+    % Create and write the dataset
+    h5create(file, loc, dims);
+    h5write(file, loc, val);
 end
 end
 
 
-function create_group_if_necessary(file, group)
-% Create the specified HDF5 group if it doesn't already exist either as a group
-% or as a dataset
-
-% If we can get info about this thing, then it already exists
-try
-    [~] = h5info(file, group);
-    return
-catch mexc
-    if ~strcmp(mexc.identifier,'MATLAB:imagesci:h5info:unableToFind')
-        rethrow(mexc);
-    end
-end
-% Create a new group
+function create_h5_group(file, group)
+% Create the specified HDF5 group
+%   create_h5_group(file, group)
+%
+% Required arguments:
+%   file    HDF5 filename
+%   group   HDF5 group name (full path)
 fid = H5F.open(file, 'H5F_ACC_RDWR', 'H5P_DEFAULT');
 gid = H5G.create(fid, group, 'H5P_DEFAULT','H5P_DEFAULT','H5P_DEFAULT');
 H5G.close(gid);
