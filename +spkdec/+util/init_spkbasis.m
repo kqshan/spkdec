@@ -6,7 +6,7 @@ function [basis, spk] = init_spkbasis(optimizer, src, D, varargin)
 %   basis       New SpikeBasis object
 %   spk         Detected spikes (Spikes object) where t is a shift in spike time
 % Required arguments:
-%   optimizer   SpikeOptimizer object used to optimize the spike basis
+%   optimizer   BasisOptimizer object used to optimize the spike basis
 %   data        [Inf x C] DataSrc object to read raw data from
 %   D           Number of spike basis waveforms overall
 % Parameters (key/value pairs) [default]:

@@ -10,7 +10,7 @@ function [basis_new, spk_new] = update_spkbasis(basis, src, varargin)
 %   data        [Inf x C] DataSrc object to read raw data from
 % Optional parameters (key/value pairs) [default]:
 %   solver      Solver object to detect spikes with         [ auto ]
-%   optimizer   SpikeOptimizer object to use                [ auto ]
+%   optimizer   BasisOptimizer object to use                [ auto ]
 %   reg_wt      Relative weight on proximal regularizer     [ 0.1 ]
 %   D_add       Number of basis waveforms to add            [ 0 ]
 %   batch_size  Size (#samples) of each batch               [ 256k ]
@@ -40,7 +40,7 @@ errid_dim = 'spkdec:util:update_spkbasis:DimMismatch';
 ip = inputParser();
 isemptyora = @(x,class) isempty(x) || isa(x,class);
 ip.addParameter('solver',    [], @(x) isemptyora(x,'spkdec.Solver'));
-ip.addParameter('optimizer', [], @(x) isemptyora(x,'spkdec.SpikeOptimizer'));
+ip.addParameter('optimizer', [], @(x) isemptyora(x,'spkdec.BasisOptimizer'));
 ip.addParameter('reg_wt',         0.1, @isscalar);
 ip.addParameter('D_add',            0, @isscalar);
 ip.addParameter('batch_size',256*1024, @isscalar);
@@ -60,13 +60,13 @@ optimizer = prm.optimizer;
 if isempty(optimizer)
     % Create an optimizer that matches the basis
     whbasis = basis.toWhBasis();
-    optimizer = spkdec.SpikeOptimizer(whbasis);
+    optimizer = spkdec.BasisOptimizer(whbasis);
 else
     % Make sure that it matches the basis
     obj_equal = @(a,b) (a==b) || isequal(a.saveobj(), b.saveobj());
     assert(obj_equal(optimizer.whbasis.whitener, basis.whitener) ...
         && obj_equal(optimizer.whbasis.interp, basis.interp), errid_arg, ...
-        ['The given SpikeOptimizer must use the same whitener and interp' ...
+        ['The given BasisOptimizer must use the same whitener and interp' ...
         'olator as the SpikeBasis']);
 end
 

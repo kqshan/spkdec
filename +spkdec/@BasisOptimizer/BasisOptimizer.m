@@ -1,6 +1,6 @@
 % Class for optimizing the spike basis waveforms
 %
-% SpikeOptimizer properties:
+% BasisOptimizer properties:
 % Dimensions
 %   C           - Number of data channels
 %   W           - Whitening filter length (#samples)
@@ -13,8 +13,8 @@
 %   n_iter      - Number of alternating descent steps to take
 %   verbose     - Print status updates to stdout
 %
-% SpikeOptimizer methods:
-%   SpikeOptimizer  - Construct a new SpikeOptimizer object
+% BasisOptimizer methods:
+%   BasisOptimizer  - Construct a new BasisOptimizer object
 %   optimize    - Find a basis that minimizes reconstruction error
 %   optimizeCS  - Find a channel-specific basis that minimizes rec. error
 % High-level operations
@@ -22,10 +22,10 @@
 %   updateBasis - Update a spike basis using proximal gradient descent
 % Object management
 %   copy        - Create a deep copy of this handle object
-%   saveobj     - Serialize a SpikeOptimizer object to struct
-%   loadobj     - [Static] Deserialize a SpikeOptimizer object from a struct
+%   saveobj     - Serialize a BasisOptimizer object to struct
+%   loadobj     - [Static] Deserialize a BasisOptimizer object from a struct
 
-classdef SpikeOptimizer < matlab.mixin.Copyable
+classdef BasisOptimizer < matlab.mixin.Copyable
 
 % ------------------------------------------------------------------------------
 % ========================     Public properties     ===========================
@@ -60,7 +60,7 @@ end
 properties (SetAccess=protected)
     % WhitenerBasis object that defines the space of waveforms
     %
-    % The optimization process seeks to minimize the reconstriction error in the
+    % The optimization process seeks to minimize the reconstruction error in the
     % whitened space defined by this WhitenerBasis object. This specifies both
     % the whitening (whbasis.whitener) and the sub-sample interpolation
     % (whbasis.interp) that will be applied to the spike basis waveforms.
@@ -95,8 +95,8 @@ properties
 end
 
 properties (Constant, Hidden)
-    errid_arg = 'spkdec:SpikeOptiimzer:BadArg';
-    errid_dim = 'spkdec:SpikeOptimizer:DimMismatch';
+    errid_arg = 'spkdec:BasisOptimizer:BadArg';
+    errid_dim = 'spkdec:BasisOptimizer:DimMismatch';
 end
 
 
@@ -106,10 +106,10 @@ end
 
 
 methods
-    function obj = SpikeOptimizer(whbasis, varargin)
-        % SpikeOptimizer constructor
-        %   obj = SpikeOptimizer(whbasis, ...)
-        %   obj = SpikeOptimizer(whitener, ...)
+    function obj = BasisOptimizer(whbasis, varargin)
+        % BasisOptimizer constructor
+        %   obj = BasisOptimizer(whbasis, ...)
+        %   obj = BasisOptimizer(whitener, ...)
         %
         % Required arguments
         %   whbasis   WhitenerBasis object (specifies both whitener and interp)
@@ -121,7 +121,7 @@ methods
         %   dt_search Spike timing error to search over         [ 1 ]
         %   n_iter    Number of iterations in optimization      [ 100 ]
         %   verbose   Print status updates to stdout            [ false ]
-        errid_arg = spkdec.SpikeOptimizer.errid_arg;
+        errid_arg = spkdec.BasisOptimizer.errid_arg;
         % Parse the additional arguments
         ip = inputParser();
         ip.addParameter('interp', [], ...
@@ -176,7 +176,7 @@ methods
 end
 methods (Static)
     function obj = loadobj(s)
-        obj = spkdec.SpikeOptimizer(s.whbasis, rmfield(s,'whbasis'));
+        obj = spkdec.BasisOptimizer(s.whbasis, rmfield(s,'whbasis'));
     end
 end
 

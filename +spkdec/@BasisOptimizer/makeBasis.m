@@ -14,7 +14,7 @@ function [basis_obj, spk] = makeBasis(self, spikes, D, varargin)
 %
 % This initializes the basis waveforms using a singular value decomposition
 % (SVD) on the given spike waveforms, then solves the optimization problem
-% described in SpikeOptimizer.optimize().
+% described in BasisOptimizer.optimize().
 
 % Parse optional inputs
 ip = inputParser();

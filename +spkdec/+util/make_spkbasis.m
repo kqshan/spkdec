@@ -9,7 +9,7 @@ function basis = make_spkbasis(src, whitener, varargin)
 %   whitener    Whitener object for measuring approximation error
 % Optional parameters (key/value pairs) [default]:
 %   solver      Solver object or params for construction        [ auto ]
-%   optimizer   SpikeOptimizer or params for construction       [ auto ]
+%   optimizer   BasisOptimizer or params for construction       [ auto ]
 %   basis_mode  Spike basis mode: {'channel-specific',['omni-channel']}
 %   n_iter      Number of gradient descent iterations           [ 12 ]
 %   D_start     # of spike basis waveforms for initialization   [ auto ]
@@ -36,7 +36,7 @@ function basis = make_spkbasis(src, whitener, varargin)
 ip = inputParser();
 is_s_ora = @(x,class) isstruct(x) || isa(x,class);
 ip.addParameter('solver',    struct(), @(x) is_s_ora(x,'spkdec.Solver'));
-ip.addParameter('optimizer', struct(), @(x) is_s_ora(x,'spkdec.SpikeOptimizer'));
+ip.addParameter('optimizer', struct(), @(x) is_s_ora(x,'spkdec.BasisOptimizer'));
 ip.addParameter('basis_mode', 'omni-channel', @ischar);
 ip.addParameter('n_iter',     12, @isscalar);
 ip.addParameter('D_start',    [], @(x) isempty(x) || isscalar(x));
@@ -68,7 +68,7 @@ end
 optimizer = prm.optimizer;
 if isstruct(optimizer)
     interp = spkdec.Interpolator.make_interp(prm.L, prm.R);
-    optimizer = spkdec.SpikeOptimizer(whitener, 'interp',interp, optimizer);
+    optimizer = spkdec.BasisOptimizer(whitener, 'interp',interp, optimizer);
 end
 
 % Default solver

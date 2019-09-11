@@ -19,9 +19,9 @@ assert(N==spk.N, self.errid_dim, 'Number of spike residuals must match spk.N');
 % Check that this SpikeBasis has the same whitener and interpolator as us
 obj_equal = @(a,b) (a==b) || isequal(a.saveobj(), b.saveobj());
 assert(obj_equal(basis.whitener, self.whbasis.whitener), self.errid_arg, ...
-    'Given SpikeBasis whitener must match this SpikeOptimizer object');
+    'Given SpikeBasis whitener must match this BasisOptimizer object');
 assert(obj_equal(basis.interp, self.whbasis.interp), self.errid_arg, ...
-    'Given SpikeBasis interpolator must match this SpikeOptimizer object');
+    'Given SpikeBasis interpolator must match this BasisOptimizer object');
 
 % Reconstruct the spike waveforms (detected spike + residual)
 spikes = basis.reconst(spk) + resid;
