@@ -22,6 +22,7 @@
 %   copy_modify   - Create a copy with a different basis (no longer CS)
 %   copy_modifyCS - Create a copy with a different channel-specific basis
 %   copy_nonWh    - Create a copy of this basis without whitening
+%   from_basis    - [Static] Construct from a non-CS SpikeBasis object
 % Data conversions
 %   toKern      - Return a matrix of the whitened basis waveforms
 %   toGram      - Return a Gramians object (dot products of the spike basis)
@@ -109,6 +110,9 @@ methods
 end
 
 methods (Static)
+    % Construction from a non-CS object
+    obj = from_basis(basis);
+    
     % Unit tests
     test(varargin);
 end
