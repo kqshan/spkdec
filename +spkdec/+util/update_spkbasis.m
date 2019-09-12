@@ -33,8 +33,9 @@ function [basis_new, spk_new] = update_spkbasis(basis, src, varargin)
 
 %% Deal with inputs
 
-errid_arg = 'spkdec:util:update_spkbasis:BadArg';
-errid_dim = 'spkdec:util:update_spkbasis:DimMismatch';
+errid_pfx = 'spkdec:util:update_spkbasis';
+errid_arg = [errid_pfx ':BadArg'];
+errid_dim = [errid_pfx ':DimMismatch'];
 
 % Optional parameters
 ip = inputParser();
@@ -68,6 +69,12 @@ else
         && obj_equal(optimizer.whbasis.interp, basis.interp), errid_arg, ...
         ['The given BasisOptimizer must use the same whitener and interp' ...
         'olator as the SpikeBasis']);
+    % Produce a warning if we're "downgrading" the basis
+    if isa(basis,'spkdec.SpikeBasisCS') && ~isa(optimizer,'spkdec.BasisOptCS')
+        warning([errid_pfx ':BasisDowngrade'], ['The basis is being updated '...
+            'is channel-specific, but the optimizer\nis not, and therefore ' ...
+            'the updated basis will no longer be channel-specific.']);
+    end
 end
 
 % Get some dimensions and local variables

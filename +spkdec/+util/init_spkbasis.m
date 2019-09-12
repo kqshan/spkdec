@@ -10,7 +10,6 @@ function [basis, spk] = init_spkbasis(optimizer, src, D, varargin)
 %   data        [Inf x C] DataSrc object to read raw data from
 %   D           Number of spike basis waveforms overall
 % Parameters (key/value pairs) [default]:
-%   basis_mode  Spike basis mode: {'channel-specific',['omni-channel']}
 %   t0          Sample index (1..L) corresponding to t=0    [ 1 ]
 %   det_quant   Spike detection quantile                    [ 0.995 ]
 %   det_val     Spike detection threshold                   [use det_quant]
@@ -37,7 +36,6 @@ errid_arg = 'spkdec:util:init_spkbasis:BadArg';
 
 % Optional parameters
 ip = inputParser();
-ip.addParameter('basis_mode', 'omni-channel', @ischar);
 ip.addParameter('t0', 1, @isscalar);
 ip.addParameter('det_quant', 0.995, @isscalar);
 ip.addParameter('det_val', [], @(x) isempty(x) || isscalar(x));
@@ -122,7 +120,6 @@ if verbose, fprintf('%d spikes detected\n',N); end
 
 %% Initialize the basis waveforms
 
-[basis, spk] = optimizer.makeBasis(spikes, D, ...
-    't0',t0, 'basis_mode',prm.basis_mode);
+[basis, spk] = optimizer.makeBasis(spikes, D, 't0',t0);
 
 end

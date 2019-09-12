@@ -50,7 +50,7 @@ function [basis, spk, resid] = optimize(self, data, varargin)
 %   A0      [L*C x D] whitened previous basis in Q1 coordinates
 % And since wh_00 == Q1 * wh_01 and Q1'*Q1 == I, our problem is equivalent to:
 %     minimize  ||Y - A*X||^2 + lambda*||A - A0||^2
-%   subject to  basis is orthonormal
+%   subject to  A is orthonormal
 
 
 % So that's the problem that we are solving here. We first convert the given
@@ -113,9 +113,6 @@ prm = ip.Results;
 % Convert the given spikes into Q1 coordinates
 self.Y = self.convert_spikes_to_Y(data, prm.zero_pad);
 
-% Put ourselves into omni-channel (each waveform spans all channels) mode
-self.basis_mode = 'omni-channel';
-
 % Get a starting spike basis
 L = self.L; C = self.C;
 if isempty(prm.basis_prev)
@@ -126,11 +123,7 @@ if isempty(prm.basis_prev)
     % Initialize this based on the data
     A = self.init_spkbasis(prm.D);
 else
-    [L_, C_, D] = size(prm.basis_prev);
-    assert(L_==L && C_==C, self.errid_dim, ...
-        'basis_prev must be [L x C x D] with L=%d and C=%d',L,C);
-    % Convert the given spike basis
-    A = self.whbasis.wh_01(:,:) * reshape(prm.basis_prev, [L*C, D]);
+    A = self.convert_spkbasis_to_A(prm.basis_prev);
 end
 % Store this (and lambda) in our object-level cache
 self.A0 = A;
@@ -203,6 +196,5 @@ self.verbose_cleanup();
 self.lipschitz_cleanup();
 self.spk_r = [];
 self.t_start = []; self.Y = []; self.A0 = []; self.lambda = [];
-self.basis_mode = [];
 
 end

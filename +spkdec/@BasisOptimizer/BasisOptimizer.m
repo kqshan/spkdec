@@ -15,8 +15,7 @@
 %
 % BasisOptimizer methods:
 %   BasisOptimizer  - Construct a new BasisOptimizer object
-%   optimize    - Find a basis that minimizes reconstruction error
-%   optimizeCS  - Find a channel-specific basis that minimizes rec. error
+%   optimize    - Optimize the spike basis for the given data
 % High-level operations
 %   makeBasis   - Construct a new SpikeBasis, optimized for the given spikes
 %   updateBasis - Update a spike basis using proximal gradient descent
@@ -24,6 +23,13 @@
 %   copy        - Create a deep copy of this handle object
 %   saveobj     - Serialize a BasisOptimizer object to struct
 %   loadobj     - [Static] Deserialize a BasisOptimizer object from a struct
+%
+% This class defines the main basis objective function as
+%   f(basis) = ||data - basis*spikes||^2,
+% i.e. the spike reconstruction error using the whitened inner product. The
+% optimize() routine then seeks to solve the following optimization problem:
+%     minimize    f(basis) + lambda*||basis-basis_prev||^2
+%   subject to    basis is orthonormal
 
 classdef BasisOptimizer < matlab.mixin.Copyable
 
@@ -147,10 +153,8 @@ methods
         end
     end
     
-    
     % Main optimization routine
     [basis, spk, resid] = optimize(self, spikes, varargin);
-    [basis_cs, spk, resid] = optimizeCS(self, spikes, varargin);
     
     % High-level operations
     [basis, spk] = makeBasis(self, spikes, D, varargin);
@@ -192,6 +196,7 @@ methods (Access=protected)
     % Initialization
     Y = convert_spikes_to_Y(self, spikes, pad);
     A0 = init_spkbasis(self, D);
+    A0 = convert_spkbasis_to_A(self, basis);
     
     % Optimize spikes with basis held constant
     X = optimize_spk(self, A);
@@ -203,25 +208,26 @@ methods (Access=protected)
     A = prox_grad_step(self, A, grad);
     step_ok = eval_step(self, A, prev_A, X);
     
-    % Convert from the whitened Q2 coordinates back to raw waveforms
+    % Convert from the whitened Q1 coordinates back to raw waveforms
     basis = convert_A_to_spkbasis(self, A);
 end
 
-% Other helpers
+% Higher-level helpers
 methods (Access=protected)
+    % Reconstruct spike waveforms given detected spikes + residuals
     spikes = reconstruct_spikes(self, basis, spk, resid);
+    
+    % Append two sets of spike bases (in Q1 coordinates)
+    A = append_bases(self, A1, A2);
 end
 
 
 % Temporary cache of problem constants -----------------------------------------
 
 properties (Access=protected, Transient)
-    Y           % [L*C x N x S] spike data in the Q1 basis, with the S dimension
-                % corresponding to shifts of (-dt_search:dt_search)
-    basis_mode  % Basis constraints: {'channel-specific','omni-channel'}
-    A0          % Whitened previous basis. Dimensions depend on basis_mode:
-                %   channel-specific  [L x K x C] in Q2 basis
-                %   omni-channel      [L*C x D] in Q1 basis
+    Y           % [L*C x N x S] spike data in Q1 coordinates, with the S
+                % dimension corresponding to shifts of (-dt_search:dt_search)
+    A0          % [L*C x D] whitened previous basis in Q1 coordinates
     lambda      % Weight applied to the proximal regularizer ||A-A0||
     spk_r       % User-specified sub-sample shift for each spike
     t_start     % tic() when we started this problem
@@ -244,17 +250,11 @@ methods (Access=protected)
     function lipschitz_init(self, X)
         % Initialize the Lipschitz estimate (requires the spikes X)
         %   lipschitz_init(self, X)
-        switch self.basis_mode
-            case 'channel-specific'
-                norm_map21 = norm(self.whbasis.map_21(:,:));
-            case 'omni-channel'
-                norm_map21 = 1;
-        end
         norm_XXt = 0;
         for r = 1:self.R
             norm_XXt = norm_XXt + norm(X.X_cov(:,:,r) * X.X_cov(:,:,r)');
         end
-        L_max = norm_map21^2*norm_XXt + self.lambda;
+        L_max = norm_XXt + self.lambda;
         self.lip_max = L_max; self.lip_min = self.lambda;
         self.lip = (self.lip_max+self.lip_min)/2; self.nBack = 0;
     end

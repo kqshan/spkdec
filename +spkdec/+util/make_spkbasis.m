@@ -52,6 +52,10 @@ ip.addParameter('verbose',       false, @isscalar);
 ip.parse( varargin{:} );
 prm = ip.Results;
 
+% Load a few parameters into local variables
+C = whitener.C;
+basis_mode = prm.basis_mode;
+
 % Special handling for this now-deprecated 'K' parameter
 if ~isnan(prm.K)
     warning('The "K" parameter is deprecated and should not be used');
@@ -61,14 +65,31 @@ if ~isnan(prm.K)
     end
     assert(ismember('D',ip.UsingDefaults), ...
         'The "K" and "D" parameter cannot both be given');
-    prm.D = prm.K * whitener.C;
+    prm.D = prm.K * C;
 end
 
 % Default optimizer
 optimizer = prm.optimizer;
 if isstruct(optimizer)
-    interp = spkdec.Interpolator.make_interp(prm.L, prm.R);
-    optimizer = spkdec.BasisOptimizer(whitener, 'interp',interp, optimizer);
+    % Collect the arguments
+    opt_prm = optimizer;
+    if ~isfield(opt_prm,'interp')
+        opt_prm.interp = spkdec.Interpolator.make_interp(prm.L, prm.R);
+    end
+    % Call the appropriate constructor
+    switch basis_mode
+        case 'channel-specific'
+            optimizer = spkdec.BasisOptCS(whitener, opt_prm);
+        otherwise
+            optimizer = spkdec.BasisOptimizer(whitener, opt_prm);
+    end
+end
+% Verify that the optimizer matches the basis_mode
+errmsg = 'In the "%s" basis_mode, the optimizer must be a subclass of %s';
+switch basis_mode
+    case 'channel-specific'
+        cname = 'spkdec.BasisOptCS';
+        assert(isa(optimizer,cname), errmsg, 'channel-specific', cname);
 end
 
 % Default solver
@@ -96,31 +117,28 @@ batch_prm = rmfield(prm, setdiff(fieldnames(prm),{'batch_size','n_batch'}));
 ibatch_prm = batch_prm;
 ibatch_prm.n_batch = batch_prm.n_batch * init_batch_mult;
 
-% Let's get some other dimensions and parameters
-C = optimizer.C;
-basis_mode = prm.basis_mode;
-
 % Rather than initialize them all at once, it seems to be better if we add the
 % waveforms a few at a time. Let's determine the schedule.
 D_tgt = prm.D;
 D_start = prm.D_start;
-if strcmp(basis_mode, 'channel-specific')
-    % D must always be a multiple of C
-    assert(mod(D_tgt,C)==0, ...
-        'In the "channel-specific" basis_mode, D must be divisible by C');
-    K_tgt = D_tgt/C;
-    if isempty(D_start), D_start = C; end
-    D_sched = (2:K_tgt)' * C;
-else
-    % Start with (at most) C waveforms, then step up over (at most) 3 iterations
-    if isempty(D_start), D_start = min(D_tgt,C); end
-    n_iter = min(3, D_tgt-D_start);
-    D_sched = round((1:n_iter)' * (D_tgt-D_start)/n_iter) + D_start;
+switch basis_mode
+    case 'channel-specific'
+        % D must always be a multiple of C
+        assert(mod(D_tgt,C)==0, ...
+            'In the "channel-specific" basis_mode, D must be divisible by C');
+        K_tgt = D_tgt/C;
+        if isempty(D_start), D_start = C; end
+        D_sched = (2:K_tgt)' * C;
+    otherwise
+        % Start with (at most) C waveforms, then step up over <= 3 iterations
+        if isempty(D_start), D_start = min(D_tgt,C); end
+        n_iter = min(3, D_tgt-D_start);
+        D_sched = round((1:n_iter)' * (D_tgt-D_start)/n_iter) + D_start;
 end
 
 % Initialize using traditional spike detection
 [basis, spk] = spkdec.util.init_spkbasis(optimizer, src, D_start, ...
-    't0',prm.t0, 'basis_mode',basis_mode, ibatch_prm);
+    't0',prm.t0, ibatch_prm);
 % Report the results
 if verbose
     note = sprintf(['Initialized to D=%d using ' ...
