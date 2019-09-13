@@ -16,6 +16,7 @@
 %   Q1        - Orthonormal basis for the whitener output
 %   wh_01     - Whitening operation as a map from raw waveforms to the Q1 basis
 %   wh_01r    - Alternate versions of wh_01 with sub-sample shift
+%   shift1r   - Sub-sample interpolation in Q1 coordinates
 %   Q2        - Channelwise orthonormal basis for the whitener output
 %   wh_02     - Whitening operation as a map from raw waveforms to the Q2 basis
 %   wh_02r    - Alternate versions of wh_02 with sub-sample shift
