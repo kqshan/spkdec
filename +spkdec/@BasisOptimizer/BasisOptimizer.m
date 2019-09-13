@@ -101,6 +101,7 @@ properties
 end
 
 properties (Constant, Hidden)
+    errid_pfx = 'spkdec:BasisOptimizer';
     errid_arg = 'spkdec:BasisOptimizer:BadArg';
     errid_dim = 'spkdec:BasisOptimizer:DimMismatch';
 end
@@ -194,6 +195,7 @@ end
 
 methods (Access=protected)
     % Initialization
+    A = start_optimization(self, data, prm);
     Y = convert_spikes_to_Y(self, spikes, pad);
     A0 = init_spkbasis(self, D);
     A0 = convert_spkbasis_to_A(self, basis);
@@ -206,9 +208,10 @@ methods (Access=protected)
     % Proximal gradient descent on the basis, with spikes held constant
     grad = compute_gradient(self, A, X);
     A = prox_grad_step(self, A, grad);
-    step_ok = eval_step(self, A, prev_A, X);
+    [step_ok, lhs, rhs] = eval_step(self, A, prev_A, X);
     
-    % Convert from the whitened Q1 coordinates back to raw waveforms
+    % Cleanup
+    [basis, spk, resid] = finalize_optimization(self, A, X);
     basis = convert_A_to_spkbasis(self, A);
 end
 

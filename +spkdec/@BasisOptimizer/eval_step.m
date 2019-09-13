@@ -1,17 +1,15 @@
-function step_ok = eval_step(self, A, prev_A, X)
+function [step_ok, lhs, rhs] = eval_step(self, A, prev_A, X)
 % Evaluate a proximal gradient descent step for backtracking
-%   step_ok = eval_step(self, A, prev_A, X)
+%   [step_ok, lhs, rhs] = eval_step(self, A, prev_A, X)
 %
 % Returns:
 %   step_ok   Whether this satisfies the backtracking termination criterion
+%   lhs       Left hand side of the criterion (see code for more specifics)
+%   rhs       Right hand side of the criterion
 % Required arguments:
 %   A         New value of the whitened spike basis waveforms
 %   prev_A    Previous value of the whitened spike basis waveforms
 %   X         Output struct from optimize_spk()
-%
-% The format of `A` and `prev_A` depend on self.basis_mode:
-%   channel-specific - [L x K x C] in Q2 coordinates
-%   omni-channel     - [L*C x D] in Q1 coordinates
 %
 % This uses self.lip (local Lipschitz estimate) and expects it to be the same
 % value as when we called A = prox_grad_step(prev_A, grad)
@@ -44,6 +42,8 @@ function step_ok = eval_step(self, A, prev_A, X)
 %   1/2*||map_21*(A-Ap)*X||^2 + lambda/2*||A-Ap||^2 <= L/2*||A-Ap||^2
 % or equivalently
 %   ||map_21*(A-Ap)*X||^2 <= (L-lambda)*||A-Ap||^2
+% The left- and right-hand sides of this inequality are returned as the 2nd and
+% 3rd output arguments of this method.
 
 % Compute the right hand side
 delta_A = A - prev_A;

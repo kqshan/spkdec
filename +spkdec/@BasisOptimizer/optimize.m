@@ -110,38 +110,13 @@ ip.addParameter('spk_r', [], @(x) isempty(x) || numel(x)==size(data,3));
 ip.parse( varargin{:} );
 prm = ip.Results;
 
-% Convert the given spikes into Q1 coordinates
-self.Y = self.convert_spikes_to_Y(data, prm.zero_pad);
-
-% Get a starting spike basis
-L = self.L; C = self.C;
-if isempty(prm.basis_prev)
-    assert(prm.lambda==0, self.errid_arg, ...
-        'basis_prev must be specified if lambda ~= 0');
-    assert(~isempty(prm.D), self.errid_arg, ...
-        'D must be specified if basis_prev is not given');
-    % Initialize this based on the data
-    A = self.init_spkbasis(prm.D);
-else
-    A = self.convert_spkbasis_to_A(prm.basis_prev);
-end
-% Store this (and lambda) in our object-level cache
-self.A0 = A;
-self.lambda = prm.lambda;
-% Also save the user-specified spk_r, if given
-self.spk_r = prm.spk_r(:);
-if ~isempty(self.spk_r) && (self.dt_search > 0)
-    warning('spkdec:BasisOptimizer:WeirdSearch', ['The sub-sample shift is ' ...
-        'fixed by the user-specified spk_r,\nbut we are still searching '...
-        'over full-sample shifts since dt_search > 0. This is kinda weird']);
-end
+% Initialize our object-level cache of problem constants and get our starting A
+A = self.start_optimization(data, prm);
 
 % Start the verbose output
 self.verbose_init();
 
-
 % ---------------     Perform alternating minimization     ----------------
-
 
 for iter = 1:self.n_iter
     % Optimize the spikes with basis held constant
@@ -164,7 +139,7 @@ for iter = 1:self.n_iter
     while ~step_ok
         A = self.prox_grad_step(prev_A, grad);
         % Determine if we need to backtrack
-        step_ok =self.eval_step(A, prev_A, X);
+        step_ok = self.eval_step(A, prev_A, X);
         if ~step_ok, self.lipschitz_backtrack(); end
     end
     
@@ -172,29 +147,18 @@ for iter = 1:self.n_iter
     self.verbose_update(iter, A, X);
 end
 
-
 % --------------------------    Finish up     -----------------------------
 
+% Convert A back into raw basis waveforms and package X into a Spikes object
+args_out = cell(nargout,1);
+[args_out{:}] = self.finalize_optimization(A, X);
+if nargout >= 1, basis = args_out{1}; end
+if nargout >= 2, spk   = args_out{2}; end
+if nargout >= 3, resid = args_out{3}; end
 
-% Convert the basis back into raw waveforms
-basis = self.convert_A_to_spkbasis(A);
-
-% Construct the Spikes object
-spk_t = X.s - (self.dt_search+1);
-spk = spkdec.Spikes(spk_t, X.r, X.X);
-
-% Compute the residual
-if nargout >= 3
-    resid = self.eval_error(A, X);  % [L*C x N] in Q1 coordinates
-    Lw = L + self.W-1;
-    resid = reshape(self.whbasis.Q1,[Lw*C,L*C]) * resid;
-    resid = reshape(resid, [Lw, C, spk.N]);
-end
-
-% Cleanup
+% Cleanup the remaining object-level caches
 self.verbose_cleanup();
 self.lipschitz_cleanup();
-self.spk_r = [];
-self.t_start = []; self.Y = []; self.A0 = []; self.lambda = [];
+self.t_start = [];
 
 end
