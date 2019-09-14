@@ -11,6 +11,7 @@ function basis = make_spkbasis(src, whitener, varargin)
 %   solver      Solver object or params for construction        [ auto ]
 %   optimizer   BasisOptimizer or params for construction       [ auto ]
 %   basis_mode  Spike basis mode: {'channel-specific',['omni-channel']}
+%   coh_penalty Basis self-coherence penalty                    [ 0 ]
 %   n_iter      Number of gradient descent iterations           [ 12 ]
 %   D_start     # of spike basis waveforms for initialization   [ auto ]
 %   make_ind    Rotate basis so features are independent        [ true ]
@@ -38,6 +39,7 @@ is_s_ora = @(x,class) isstruct(x) || isa(x,class);
 ip.addParameter('solver',    struct(), @(x) is_s_ora(x,'spkdec.Solver'));
 ip.addParameter('optimizer', struct(), @(x) is_s_ora(x,'spkdec.BasisOptimizer'));
 ip.addParameter('basis_mode', 'omni-channel', @ischar);
+ip.addParameter('coh_penalty', 0, @isscalar);
 ip.addParameter('n_iter',     12, @isscalar);
 ip.addParameter('D_start',    [], @(x) isempty(x) || isscalar(x));
 ip.addParameter('make_ind', true, @isscalar);
@@ -55,6 +57,7 @@ prm = ip.Results;
 % Load a few parameters into local variables
 C = whitener.C;
 basis_mode = prm.basis_mode;
+coh_penalty = prm.coh_penalty;
 
 % Special handling for this now-deprecated 'K' parameter
 if ~isnan(prm.K)
@@ -76,20 +79,35 @@ if isstruct(optimizer)
     if ~isfield(opt_prm,'interp')
         opt_prm.interp = spkdec.Interpolator.make_interp(prm.L, prm.R);
     end
+    if coh_penalty > 0
+        opt_prm.coh_penalty = coh_penalty;
+    end
     % Call the appropriate constructor
     switch basis_mode
         case 'channel-specific'
+            assert(coh_penalty==0, ['basis_mode="channel-specific" with ' ...
+                'coh_penalty~=0 is not yet supported']);
             optimizer = spkdec.BasisOptCS(whitener, opt_prm);
         otherwise
-            optimizer = spkdec.BasisOptimizer(whitener, opt_prm);
+            if coh_penalty > 0
+                optimizer = spkdec.BasisOptIncoh(whitener, opt_prm);
+            else
+                optimizer = spkdec.BasisOptimizer(whitener, opt_prm);
+            end
     end
 end
 % Verify that the optimizer matches the basis_mode
-errmsg = 'In the "%s" basis_mode, the optimizer must be a subclass of %s';
+errmsg = 'If %s, then the optimizer must be a subclass of %s';
 switch basis_mode
     case 'channel-specific'
         cname = 'spkdec.BasisOptCS';
-        assert(isa(optimizer,cname), errmsg, 'channel-specific', cname);
+        assert(isa(optimizer,cname), errmsg, ...
+            'basis_mode = "channel-specific"', cname);
+end
+% And can handle the coherence penalty
+if coh_penalty > 0
+    cname = 'spkdec.BasisOptIncoh';
+    assert(isa(optimizer,cname), errmsg, 'coh_penalty > 0', cname);
 end
 
 % Default solver
