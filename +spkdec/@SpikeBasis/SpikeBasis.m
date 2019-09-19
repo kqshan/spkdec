@@ -34,6 +34,7 @@
 % High-level operations
 %   getDelta    - Return the improvement in squared error from adding a spike
 %   solve       - Solve for the spike features given the spike times
+%   solve_spk   - Solve for the spike features given extracted spikes
 % Object management
 %   copy        - Create a deep copy of this handle object
 %   saveobj     - Serialize a SpikeBasis object to struct
@@ -189,6 +190,7 @@ methods
     % High-level operations
     delta = getDelta(self, convT_y);
     spk_X = solve(self, convT_y, spk_t, spk_r, varargin);
+    spk_X = solve_spk(self, waveforms, spk_r);
 end
 
 methods (Static)
