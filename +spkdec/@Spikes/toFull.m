@@ -27,8 +27,10 @@ assert(all(spk_t >= 1), errid_arg, 'self.t must be >= 1 when calling toFull()');
 spk_r = self.r;
 
 % Check that the dimensions are compatible
-assert(T >= max(spk_t), errid_dim, errmsg_dim, 'need T >= max(self.t)');
-assert(R >= max(spk_r), errid_dim, errmsg_dim, 'need R >= max(self.r)');
+if (N > 0)
+    assert(T >= max(spk_t), errid_dim, errmsg_dim, 'need T >= max(self.t)');
+    assert(R >= max(spk_r), errid_dim, errmsg_dim, 'need R >= max(self.r)');
+end
 
 % Construct the output matrix
 X = zeros(D, R*T, 'like',spk_X);

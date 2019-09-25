@@ -20,7 +20,7 @@ else
 end
 
 % Construct a new Spikes object with this subset of spikes
-if isempty(self.X)
+if size(self.X,1)==0
     X = [];
 else
     X = self.X(:,mask);

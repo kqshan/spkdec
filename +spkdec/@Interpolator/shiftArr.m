@@ -18,6 +18,9 @@ if nargin < 4, trans = false; end
 [L,C,N] = size(X);
 assert(N==numel(r), self.errid_dim, 'The length of r must match X');
 
+% Special case if it's an empty input
+if (N==0), return; end
+
 % Group by shift index
 R = self.R;
 r_idx = accumarray(r(:), (1:N)', [R 1], @(x) {x});

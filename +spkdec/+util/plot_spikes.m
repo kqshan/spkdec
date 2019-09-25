@@ -132,10 +132,15 @@ spike_t = [spike_t; NaN(1,N)];                  % [Lw+1 x N]
 spike_t = spike_t(:);                           % [(Lw+1)*N x 1]
 
 % Vertical layout
+% Data and spike limits for each channel
+data_min = min(data,[],1);
+data_max = max(data,[],1);
+spike_min = min([spike_y; zeros(1,C)], [], 1);
+spike_max = max([spike_y; zeros(1,C)], [], 1);
 % Default value for inter-channel spacing
 spacing = prm.spacing;
 if isempty(spacing)
-    ch_range = max(data(:,end)) - min(data(:,1));
+    ch_range = data_max(C) - data_min(1);
     if (C > 1)
         ch_gap = max(diff(data,1,2), [],'all');
     else
@@ -146,8 +151,7 @@ if isempty(spacing)
 end
 % Get the offsets between channels and between data and spikes
 data_ch_offsets = (0:C-1) * spacing;
-data_spike_offset = max(data(:,end)) + data_ch_offsets(end) ...
-    + spacing - min(spike_y(:,1));
+data_spike_offset = data_max(C) + data_ch_offsets(C) + spacing - spike_min(1);
 spike_ch_offsets = zoom_y*data_ch_offsets + data_spike_offset;
 
 % Construct the connector lines with temporal superresolution
@@ -160,10 +164,10 @@ conline_t = conline_t(:);                                       % [5*N x 1]
 % And the y-coordinates
 conline_padding = 0.1 * spacing;
 conline_y0 = [
-    min(data(:,1))      + data_ch_offsets(1)    - conline_padding
-    max(data(:,end))    + data_ch_offsets(end)  + conline_padding
-    min(spike_y(:,1))   + spike_ch_offsets(1)   - conline_padding
-    max(spike_y(:,end)) + spike_ch_offsets(end) + conline_padding
+    data_min(1)  + data_ch_offsets(1)  - conline_padding
+    data_max(C)  + data_ch_offsets(C)  + conline_padding
+    spike_min(1) + spike_ch_offsets(1) - conline_padding
+    spike_max(C) + spike_ch_offsets(C) + conline_padding
     ];
 conline_y = repmat([conline_y0; NaN], [1 N]);
 conline_y = conline_y(:);                                       % [5*N x 1]
@@ -199,8 +203,10 @@ handles.data  = plot(ah, data_t,  data + data_ch_offsets, '-');
 handles.resid = plot(ah, data_t, resid + data_ch_offsets, 'k-');
 % Individual spikes
 handles.spikes = plot(ah, spike_t, spike_y + spike_ch_offsets, '-');
-for c = 1:C
-    handles.spikes(c).Color = handles.data(c).Color;
+if (N > 0)
+    for c = 1:C
+        handles.spikes(c).Color = handles.data(c).Color;
+    end
 end
 
 % Make it pretty
@@ -240,7 +246,7 @@ function [spike_t, spk_dt, zoom] = layout_spikes(spk_t, rel_t, zoom, T)
 L = length(rel_t); assert(all(diff(rel_t)==1));
 t0 = find(rel_t==0); assert(isscalar(t0));
 N = length(spk_t);
-if (N==0), spike_t = zeros(L,1); spk_dt = zeros(0,1); return; end
+if (N==0), spike_t = zeros(L,0); spk_dt = zeros(0,1); return; end
 
 % Identify sequences of overlapping spikes
 is_1st_in_seq = [true; diff(spk_t) >= L];
