@@ -166,7 +166,7 @@ end
 
 methods (Access=protected)
     function obj = copyElement(self)
-        obj = copyElement@matlab.mixin.copyable(self);
+        obj = copyElement@matlab.mixin.Copyable(self);
         obj.whbasis = copy(self.whbasis);
     end
 end
