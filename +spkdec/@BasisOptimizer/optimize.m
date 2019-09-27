@@ -25,6 +25,10 @@ function [basis, spk, resid] = optimize(self, data, varargin)
 % shifts in the detected spike times. This reduces the incentive to represent
 % such shifts using the spike basis itself.
 
+% Secret parameters (key/value pairs) [default]:
+%   live_ah     Axes handle for live updates of the basis waveforms [ none ]
+%   live_delay  Delay (s) between live updates                      [ 0.01 ]
+
 
 % --------------------     Problem description     ------------------------
 
@@ -107,6 +111,8 @@ ip.addParameter('basis_prev', []);
 ip.addParameter('D', [], @(x) isempty(x) || isscalar(x));
 ip.addParameter('zero_pad', [0 0], @(x) numel(x)==2);
 ip.addParameter('spk_r', [], @(x) isempty(x) || numel(x)==size(data,3));
+ip.addParameter('live_ah', [], @(x) isempty(x) || ishandle(x));
+ip.addParameter('live_delay', 0.01, @isscalar);
 ip.parse( varargin{:} );
 prm = ip.Results;
 
@@ -115,6 +121,7 @@ A = self.start_optimization(data, prm);
 
 % Start the verbose output
 self.verbose_init();
+self.live_init(A, prm);
 
 % ---------------     Perform alternating minimization     ----------------
 
@@ -145,6 +152,7 @@ for iter = 1:self.n_iter
     
     % Verbose update
     self.verbose_update(iter, A, X);
+    self.live_update(A);
 end
 
 % --------------------------    Finish up     -----------------------------
@@ -157,6 +165,7 @@ if nargout >= 2, spk   = args_out{2}; end
 if nargout >= 3, resid = args_out{3}; end
 
 % Cleanup the remaining object-level caches
+self.live_cleanup();
 self.verbose_cleanup();
 self.lipschitz_cleanup();
 self.t_start = [];

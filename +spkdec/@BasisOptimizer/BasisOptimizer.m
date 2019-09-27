@@ -301,4 +301,22 @@ methods (Access=protected)
     end
 end
 
+% Live updates of the basis waveforms ------------------------------------------
+
+properties (Access=protected, Transient)
+    live_lh     % [D x 1] Line handles for the plotted basis waveforms
+    live_delay  % Animation delay for the live updates
+    live_space  % Inter-channel spacing for the plots
+end
+methods (Access=protected)
+    live_init(self, A, prm);
+    live_update(self, A);
+    [x,y] = convert_A_to_plot_coords(self, A);
+    
+    function live_cleanup(self)
+        % Cleanup the temporary variables used in the live basis updates
+        self.live_lh = []; self.live_delay = []; self.live_space = [];
+    end
+end
+
 end

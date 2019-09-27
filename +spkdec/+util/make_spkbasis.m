@@ -22,6 +22,7 @@ function basis = make_spkbasis(src, whitener, varargin)
 %   batch_size  Size (#samples) of each batch                   [ 256k ]
 %   n_batch     Number of randomly-selected batches per iter    [ 8 ]
 %   verbose     Print status updates to stdout                  [ false ]
+%   live_plot   Show live updates of fitting the basis          [ false ]
 %
 % This initializes the spike basis waveforms using spkdec.util.init_spkbasis,
 % then performs stochastic gradient descent using spkdec.util.update_spkbasis.
@@ -51,6 +52,7 @@ ip.addParameter('t0', 9, @isscalar);
 ip.addParameter('batch_size', 256*1024, @isscalar);
 ip.addParameter('n_batch',           8, @isscalar);
 ip.addParameter('verbose',       false, @isscalar);
+ip.addParameter('live_plot',     false, @isscalar);
 ip.parse( varargin{:} );
 prm = ip.Results;
 
@@ -126,12 +128,21 @@ if verbose
 end
 t_start = tic();
 
+% Live updates
+if prm.live_plot
+    figure();
+    live_ah = gca();
+else
+    live_ah = [];
+end
+
 %% Initialize basis waveforms
 
 % Perform these steps with a larger number of batches, since the initialization
 % steps are bit more sensitive to sampling noise
 init_batch_mult = 4;
 batch_prm = rmfield(prm, setdiff(fieldnames(prm),{'batch_size','n_batch'}));
+batch_prm.live_ah = live_ah;
 ibatch_prm = batch_prm;
 ibatch_prm.n_batch = batch_prm.n_batch * init_batch_mult;
 

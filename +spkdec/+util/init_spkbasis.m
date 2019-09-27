@@ -16,6 +16,7 @@ function [basis, spk] = init_spkbasis(optimizer, src, D, varargin)
 %   batch_size  Size (#samples) of each batch               [ 256k ]
 %   n_batch     Number of randomly-selected batches         [ 32 ]
 %   verbose     Print status updates to stdout              [ false ]
+%   ...         Add'l parameters are forwarded to optimizer.makeBasis()
 %
 % This detects spikes by looking for peaks in the norm (across channels) of the
 % whitened data. If <det_quant> is used (as opposed to <det_val>), then the
@@ -36,6 +37,7 @@ errid_arg = 'spkdec:util:init_spkbasis:BadArg';
 
 % Optional parameters
 ip = inputParser();
+ip.KeepUnmatched = true; ip.PartialMatching = false;
 ip.addParameter('t0', 1, @isscalar);
 ip.addParameter('det_quant', 0.995, @isscalar);
 ip.addParameter('det_val', [], @(x) isempty(x) || isscalar(x));
@@ -44,6 +46,7 @@ ip.addParameter('n_batch', 32, @isscalar);
 ip.addParameter('verbose', false, @isscalar);
 ip.parse( varargin{:} );
 prm = ip.Results;
+addl_args = ip.Unmatched;
 
 % Check dimensions
 C = optimizer.C;
@@ -120,6 +123,6 @@ if verbose, fprintf('%d spikes detected\n',N); end
 
 %% Initialize the basis waveforms
 
-[basis, spk] = optimizer.makeBasis(spikes, D, 't0',t0);
+[basis, spk] = optimizer.makeBasis(spikes, D, 't0',t0, addl_args);
 
 end

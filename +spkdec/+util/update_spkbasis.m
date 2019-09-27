@@ -16,6 +16,7 @@ function [basis_new, spk_new] = update_spkbasis(basis, src, varargin)
 %   batch_size  Size (#samples) of each batch               [ 256k ]
 %   n_batch     Number of randomly-selected batches         [ 32 ]
 %   verbose     Print status updates to stdout              [ false ]
+%   ...         Add'l parameters are forwarded to optimizer.updateBasis()
 %
 % This randomly selects some batches of data from the given source, detects
 % spikes using the given <basis> and <solver>, then uses the given <optimizer>
@@ -39,6 +40,7 @@ errid_dim = [errid_pfx ':DimMismatch'];
 
 % Optional parameters
 ip = inputParser();
+ip.KeepUnmatched = true; ip.PartialMatching = false;
 isemptyora = @(x,class) isempty(x) || isa(x,class);
 ip.addParameter('solver',    [], @(x) isemptyora(x,'spkdec.Solver'));
 ip.addParameter('optimizer', [], @(x) isemptyora(x,'spkdec.BasisOptimizer'));
@@ -49,6 +51,7 @@ ip.addParameter('n_batch',         32, @isscalar);
 ip.addParameter('verbose',      false, @isscalar);
 ip.parse( varargin{:} );
 prm = ip.Results;
+addl_args = ip.Unmatched;
 
 % Default solver
 solver = prm.solver;
@@ -143,6 +146,6 @@ end
 if verbose, fprintf('Optimizing spike basis waveforms...\n'); end
 
 [basis_new, spk_new] = optimizer.updateBasis(basis, spk_all, resid_all, ...
-    'reg_wt',prm.reg_wt, 'D_add',prm.D_add);
+    'reg_wt',prm.reg_wt, 'D_add',prm.D_add, addl_args);
 
 end
