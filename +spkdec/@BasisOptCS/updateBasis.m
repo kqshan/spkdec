@@ -13,6 +13,7 @@ function [basis_obj, spk_new] = updateBasis(self, basis, spk, resid, varargin)
 %   lambda      Regularizer param in optimize()             [defer to reg_wt]
 %   reg_wt      Relative weight to put on regularizer       [ 0.1 ]
 %   D_add       Number of basis waveforms to add            [ 0 ]
+%   ...         Add'l parameters are forwarded to optimize()
 %
 % This calls self.optimize() to solve the following optimization problem:
 %       minimize    ||Y - basis.reconst(X)||^2 + lambda*||basis-basis_old||^2

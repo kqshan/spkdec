@@ -13,6 +13,7 @@ function [basis_obj, spk_new] = updateBasis(self, basis, spk, resid, varargin)
 %   lambda      Regularizer param in optimize()             [defer to reg_wt]
 %   reg_wt      Relative weight to put on regularizer       [ 0.1 ]
 %   D_add       Number of basis waveforms to add            [ 0 ]
+%   ...         Add'l parameters are forwarded to optimize()
 %
 % This calls self.optimize() to solve the following optimization problem:
 %       minimize    ||Y - basis.reconst(X)||^2 + lambda*||basis-basis_old||^2
@@ -28,11 +29,13 @@ function [basis_obj, spk_new] = updateBasis(self, basis, spk, resid, varargin)
 
 % Optional params
 ip = inputParser();
+ip.KeepUnmatched = true; ip.PartialMatching = false;
 ip.addParameter('lambda', [], @(x) isempty(x) || isscalar(x));
 ip.addParameter('reg_wt', 0.1, @isscalar);
 ip.addParameter('D_add', 0, @isscalar);
 ip.parse( varargin{:} );
 prm = ip.Results;
+addl_args = ip.Unmatched;
 
 % Reconstruct the spike waveforms (also performs input checks)
 spikes = self.reconstruct_spikes(basis, spk, resid);
@@ -66,7 +69,7 @@ end
 
 % Optimize the basis
 [basis_new, spk_new] = self.optimize(spikes, ...
-    'lambda',lambda, 'basis_prev',basis_prev);
+    'lambda',lambda, 'basis_prev',basis_prev, addl_args);
 
 % Construct the SpikeBasis object
 basis_obj = basis.copy_modify(basis_new);
