@@ -24,7 +24,7 @@ needs_iter_update = (verbose > 1) && (is_first_iter || is_final_iter || ...
 if is_first_iter || is_final_iter || needs_iter_update
     err = self.eval_error(A, X);
     err = sum(err.^2,'all');
-    coh = sum((self.coh_L'*A).^2,'all');
+    coh = self.compute_coherence_penalty(A);
     obj = err + self.coh_penalty*coh;
 end
 % Store this if it's the first iter

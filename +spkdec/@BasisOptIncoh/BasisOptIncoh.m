@@ -127,13 +127,16 @@ end
 % Individual steps of the optimization -----------------------------------------
 
 methods (Access=protected)
-    % Modified to also compute/cleanup coh_YYt, coh_L
+    % Modified to also compute/cleanup the new cached values
     A = start_optimization(self, data, prm);
     [basis, spk, resid] = finalize_optimization(self, A, X);
     
     % Modified to include the coherence regularizer in the f() term
     grad = compute_gradient(self, A, X);
     [step_ok, lhs, rhs] = eval_step(self, A, prev_A, X);
+    
+    % New function to compute the coherence penalty
+    g = compute_coherence_penalty(self, A, B);
 end
 
 % Temporary cache of problem constants -----------------------------------------
@@ -142,6 +145,7 @@ properties (Access=protected, Transient)
     coh_YYt     % [L*C x L*C] mean shifted spike covariance (Y*Y') in Q1 coords
                 %   coh_YYt = sum_t(w_t*shift_t*Y*Y'*shift_t)/sum_t(w_t)
     coh_L       % Cholesky decomposition of coh_YYt: coh_L*coh_L' == coh_YYt
+    grad_g      % [L*C x D] gradient of the coherence penalty
 end
 
 % Backtracking -----------------------------------------------------------------

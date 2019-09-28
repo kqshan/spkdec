@@ -13,6 +13,9 @@ function [step_ok, lhs, rhs] = eval_step(self, A, prev_A, X)
 %
 % This uses self.lip (local Lipschitz estimate) and expects it to be the same
 % value as when we called A = prox_grad_step(prev_A, grad)
+%
+% This also uses self.grad_g and expects it to contain the gradient of the
+% coherence penalty g(A) evaluated at prev_A.
 
 % To summarize the superclass method, we are trying to determine whether
 %   f(A) <= f(Ap) + <grad_f(Ap),A-Ap> + L/2*||A-Ap||^2
@@ -21,20 +24,29 @@ function [step_ok, lhs, rhs] = eval_step(self, A, prev_A, X)
 % Due to the quadratic form of f(A), it turns out that
 %   f(A) = f(Ap) + <grad_f(Ap),A-Ap> + 1/2*||map_21*(A-Ap)*X||^2 ...
 %          + lambda/2*||A-Ap||^2
-% and substituting this into our original inequality yields
+% and substituting this into our original inequality (and multiplying both sides
+% by 2) yields
 %   ||map_21*(A-Ap)*X||^2 <= (L-lambda)*||A-Ap||^2.
 % These are the `lhs` and `rhs` outputs of the superclass method.
 [~, lhs, rhs] = eval_step@spkdec.BasisOptimizer(self, A, prev_A, X);
 
 % We now wish to add an additional term to f(A):
-%        g(A) = coh_penalty/2 * ||coh_L'*A||^2
-%   grad_g(A) = coh_penalty * coh_L*coh_L' * A
-% Similar to f(A) above, we can note that
-%   g(A) = g(Ap) + <grad_g(Ap),A-Ap> + coh_penalty/2*||coh_L'*(A-Ap)||^2
-% and so we can incorporate this into our overall inequality by simply adding
-%   lhs += coh_penalty*||coh_L'*(A-Ap)||^2
-delta_A = A - prev_A;
-lhs = lhs + self.coh_penalty * sum((self.coh_L'*delta_A).^2, 'all');
+%   f(A) += coh/2 * g(A)
+% However, this g(A) isn't just a quadratic form, so we will have to update the
+% inequality with (remember that both sides have been multiplied by 2)
+%   lhs += coh * g(A)
+%   rhs += coh * g(Ap) + 2*coh*<grad_g(Ap),A-Ap>.
+% Or equivalently (and potentially better-behaved numerically):
+%   lhs += coh * (g(A) - g(Ap))
+%   rhs += 2 * coh * <grad_g(Ap), A-Ap>
+
+% Update the left hand side
+delta_g = self.compute_coherence_penalty(A, prev_A);
+lhs = lhs + self.coh_penalty * delta_g;
+
+% Update the right hand side, noting that self.grad_g = grad_g(Ap)
+dotprod = sum(self.grad_g .* (A-prev_A), 'all');
+rhs = rhs + 2 * self.coh_penalty * dotprod;
 
 % Evaluate the backtracking termination criterion
 step_ok = (lhs <= rhs);

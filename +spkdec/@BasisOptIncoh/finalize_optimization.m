@@ -14,7 +14,7 @@ function [basis, spk, resid] = finalize_optimization(self, A, X)
 %     s       [N x 1] full-sample shift index (1..S)
 %
 % This also cleans up the following object-level caches:
-%   spk_r, Y, A0, lambda, coh_YYt, coh_L
+%   spk_r, Y, A0, lambda, coh_YYt, coh_L, grad_g
 
 % Call the parent method
 args_out = cell(nargout,1);
@@ -24,6 +24,6 @@ if nargout >= 2, spk   = args_out{2}; end
 if nargout >= 3, resid = args_out{3}; end
 
 % Cleanup the additional caches
-self.coh_YYt = []; self.coh_L = [];
+self.coh_YYt = []; self.coh_L = []; self.grad_g = [];
 
 end

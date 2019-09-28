@@ -21,48 +21,46 @@ function A = start_optimization(self, data, prm)
 %   spk_r       User-specified sub-sample shift for each spike
 %   coh_YYt     [L*C x L*C] mean of Y*Y' with different amount of shift applied
 %   coh_L       Cholesky decomposition of coh_YYt: coh_L*coh_L' == coh_YYt
+%   grad_g      Gradient of the coherence penalty g(A)
 
 % Call the superclass method
 A = start_optimization@spkdec.BasisOptimizer(self, data, prm);
 
 % Compute coh_YYt
 % Get some dimensions and local variables
-[LC,~,S] = size(self.Y);
-L = self.L; C = self.C; assert(LC==L*C);
-R = self.R;
+[Lw,C,N] = size(data);
+L = self.L;
 Q1 = self.whbasis.Q1;
-Lw = size(Q1,1);
-Sr = self.whbasis.shift1r;
-% Compute Y*Y' for the one that corresponds to dt==0
-s_idx = (S-1)/2 + 1;
-assert(mod(s_idx,1)==0);
-Y = self.Y(:,:,s_idx);
-YYt = gather(double(Y*Y'));
-% Sum this over +/- L with of shifts
-coh_YYt = zeros(LC,LC);
-for dt = 0:L
-    % Construct the shift operator in Q1 coordinates
-    shift = reshape(Q1(dt+1:end,:,:), [(Lw-dt)*C, LC])' ...
-        * reshape(Q1(1:end-dt,:,:), [(Lw-dt)*C, LC]);
-    % Sum over sub-sample shifts as well
-    for r = 1:R
-        S = Sr(:,:,r)' * shift;
-        coh_YYt = coh_YYt + S*YYt*S';
-        % And include negative shifts too
-        if (dt > 0)
-            S = Sr(:,:,r)' * shift';
-            coh_YYt = coh_YYt + S*YYt*S';
-        end
-        % Go on to the next sub-sample shift
-    end
-    % Go on to the next full-sample shift
+% Compute data_cov = data'*data as a [Lw x C x Lw x C] array
+data_cov = reshape(data, [Lw*C, N]);
+data_cov = gather(data_cov * data_cov');    % [Lw*C x Lw*C]
+data_cov = reshape(data_cov,[Lw C Lw C]);
+% Sum Q1'*data_cov*Q1 over +/- L worth of shifts
+coh_YYt = zeros(L*C, L*C);
+for dt = -L:L
+    % Get the shifted versions of Q1 and the data
+    dt_pos = max(dt,0);
+    dt_neg = min(dt,0);
+    dcov_s = data_cov(1+dt_pos:Lw+dt_neg, :, 1+dt_pos:Lw+dt_neg, :);
+    Q1_s = Q1(1-dt_neg:Lw-dt_pos, :, :);
+    % Compute the contribution
+    Lw_s = Lw - abs(dt);
+    dcov_s = reshape(dcov_s, [Lw_s*C, Lw_s*C]);
+    Q1_s = reshape(Q1_s, [Lw_s*C, L*C]);
+    YYt_s = Q1_s' * dcov_s * Q1_s;
+    % Add this to our accumulator
+    coh_YYt = coh_YYt + double(YYt_s);
 end
-T = R * (2*L+1);
+T = 2*L + 1;
 coh_YYt = coh_YYt / T;
 % Store this result
 self.coh_YYt = coh_YYt;
 
 % Compute coh_L
+assert(T*N >= L*C);
 self.coh_L = chol(coh_YYt, 'lower');
+
+% Place an empty filler into grad_g
+self.grad_g = [];
 
 end
