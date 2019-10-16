@@ -21,6 +21,7 @@ function [wh, specs] = make_spk_whitener(data, varargin)
 %   filt_len    Desired filter length (must be odd)             [ 201 ]
 %   bp_freq     Spike band cutoff freqs (cycles/sample)         [ 0.02, 0.4 ]
 %   bp_order    Spike bandpass rolloff order (1 = 20dB/dec)     [ 2, 4 ]
+%   min_resp    Minimum response of the designed bandpass       [ 0 ]
 %   aa_freq     Anti-aliasing filter frequency                  [ 0.47 ]
 %   reg_lambda  Relative weight for regularizer term            [ 1 ]
 %
@@ -31,6 +32,11 @@ function [wh, specs] = make_spk_whitener(data, varargin)
 % magnitude spectra for the filtered data. For a data sampling rate of 25 kHz,
 % the default cutoffs correspond to 500 Hz and 10 kHz. You may need to adjust
 % this (and/or the rolloff order) to suit your data.
+%
+% <min_resp> puts a floor on the desired magnitude spectra for the filtered
+% data. If the specified bandpass filter has wide stopbands, then this may need
+% to be set to a small value, such as 0.01, to prevent the whitening operation
+% from becoming too poorly-conditioned.
 %
 % <aa_freq> and <reg_lambda> control the least-squares design of the symmetric
 % FIR filters that will be whitening filters; see spkdec.Whitener.makeWhFilt()
@@ -50,6 +56,7 @@ ip.addParameter('n_batch', 32, @isscalar);
 ip.addParameter('filt_len', 201, @isscalar);
 ip.addParameter('bp_freq', [0.02, 0.4], @(x) numel(x)==2);
 ip.addParameter('bp_order', [2, 4], @(x) numel(x)==2);
+ip.addParameter('min_resp', 0, @isscalar);
 ip.addParameter('aa_freq', 0.47, @isscalar);
 ip.addParameter('reg_lambda', 1, @isscalar);
 ip.parse( varargin{:} );
@@ -83,7 +90,8 @@ spectra = spkdec.util.estimate_spectra(data, 'N_fft',N, 'n_batch',prm.n_batch);
 % Parse the filter specs into a desired frequency response
 highpass = @(f) 1 - 1./(1 + (f/f1).^n1);
 lowpass  = @(f)     1./(1 + (f/f2).^n2);
-tgt_mag  = @(f) highpass(f) .* lowpass(f);
+a = prm.min_resp;
+tgt_mag  = @(f) a + (1-a)*highpass(f) .* lowpass(f);
 
 % Design the filter
 [wh_filt, specs] = spkdec.Whitener.makeWhFilt(spectra, ...
