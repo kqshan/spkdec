@@ -17,8 +17,9 @@ H = self.get_gram_chol();
 
 % Compute the norm for each sub-sample shift
 R = self.R; N = spk.N;
-r_idx = accumarray(spk.r, (1:N)', [R 1], @(x) {x});
 norms = zeros(N,1, 'like',spk.X);
+if (N==0), return; end % Special case b/c accumarray doesn't like empty inputs
+r_idx = accumarray(spk.r, (1:N)', [R 1], @(x) {x});
 for r = 1:R
     idx = r_idx{r};
     Z = H(:,:,r) * spk.X(:,idx);
