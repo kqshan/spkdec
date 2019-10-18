@@ -101,7 +101,9 @@ methods (Access=protected)
         end
         T = count(d);
         % Write the data
-        h5write(self.filename, self.dsname, data, start, count);
+        if (T > 0)
+            h5write(self.filename, self.dsname, data, start, count);
+        end
         % Increment the length
         self.len = self.len + T;
     end
