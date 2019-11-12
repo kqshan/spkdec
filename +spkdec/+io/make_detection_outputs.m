@@ -149,7 +149,8 @@ for name_cell = dataset_names'
     name = name_cell{1};
     datatype = datatype_prm.(name);
     if contains(datatype,'int')
-        datasets.(name) = spkdec.io.DataSinkInt(datasets.(name), datatype);
+        datasets.(name) = spkdec.io.DataSinkInt(datasets.(name), datatype, ...
+            'err_mode','warn');
     end
 end
 
