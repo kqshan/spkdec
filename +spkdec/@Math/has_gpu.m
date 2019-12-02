@@ -46,12 +46,8 @@ end
 try
     x = gpuArray(); %#ok<NASGU>
     tf = true;
-catch mexc
-    if strcmp(mexc.identifier, 'parallel:gpu:device:DriverRedirect')
-        tf = false;
-    else
-        rethrow(mexc);
-    end
+catch
+    tf = false;
 end
 has_gpu_val = tf;
 
