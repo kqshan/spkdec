@@ -151,7 +151,8 @@ if isempty(spacing)
 end
 % Get the offsets between channels and between data and spikes
 data_ch_offsets = (0:C-1) * spacing;
-data_spike_offset = data_max(C) + data_ch_offsets(C) + spacing - spike_min(1);
+data_spike_offset = max(data_max(C),0) + data_ch_offsets(C) ...
+    + spacing - spike_min(1);
 spike_ch_offsets = zoom_y*data_ch_offsets + data_spike_offset;
 
 % Construct the connector lines with temporal superresolution
