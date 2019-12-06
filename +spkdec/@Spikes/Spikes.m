@@ -133,7 +133,7 @@ methods
 end
 methods (Static)
     function obj = loadobj(s)
-        obj = spkdec.Spikes(s);
+        obj = spkdec.Spikes(s.t, s.r, s.X);
     end
 end
 
