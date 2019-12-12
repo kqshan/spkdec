@@ -62,6 +62,7 @@ T_b = T_b - pad_wh; assert(T_b > 0);
 cap_val = prm.cap_val;
 if isempty(cap_val)
     abs_x = reshape(permute(abs(x),[1 3 2]), [T_b*B, C]);
+    abs_x = gather(abs_x); % quantile() is not happy with large gpuArrays
     cap_val = quantile(abs_x, prm.cap_quant);
 else
     assert(isscalar(cap_val) || numel(cap_val) == C, errid_dim, ...
