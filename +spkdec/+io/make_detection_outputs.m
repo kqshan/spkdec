@@ -10,9 +10,10 @@ function [outputs, sinks] = make_detection_outputs(basis, varargin)
 % Optional parameters (key/value pairs):
 %   filename    HDF5 output filename, or empty to use DataSinkMatrix objects
 %               instead. Default = [].
+%   dataresid   Include the `dataresid` output as well. Default = false
 %   *_datatype  Storage datatype. Defaults: index = uint32, subidx = uint8,
-%               {feature,spknorm,resid,residnorm} = single.
-%   *_scaling   Dataset scaling ({feature,resid} datasets only). This is useful
+%               {feature,spknorm,resid,residnorm,dataresid} = single.
+%   *_scaling   Dataset scaling ({feature,resid,dataresid} only). This is useful
 %               if you wish to store these as integer types. Default = 1.
 %   det_thresh  Detection threshold as specified to util.detect_spikes()
 %   det_refrac  Detection refractory period as specified to util.detect_spikes()
@@ -50,6 +51,10 @@ function [outputs, sinks] = make_detection_outputs(basis, varargin)
 %     thresh      Detection threshold (see spkdec.Solver.det_thresh)
 %     norm        Minimum detectable spknorm, equal to sqrt(D*det_thresh)
 %     refrac      Detection refractory period (#samples)
+% If <dataresid>==true, then this will also contain the following group:
+%   dataresid   Data residual (raw data minus detected spikes)
+%     dataset     [T x C] DataSink
+%     scaling     Scaling coefficient to apply when reading this dataset
 %
 % If you call this with <file>=[], then after running util.detect_spikes(), you
 % can extract the data matrices out of their DataSinkMatrix wrappers using:
@@ -64,14 +69,17 @@ errid_pfx = 'spkdec:io:make_detection_outputs';
 % Parse optional parameters
 ip = inputParser();
 ip.addParameter('filename', [], @(x) isempty(x) || ischar(x));
+ip.addParameter('dataresid', false, @isscalar);
 ip.addParameter('feature_datatype', 'single', @ischar);
 ip.addParameter('index_datatype', 'uint32', @ischar);
 ip.addParameter('subidx_datatype', 'uint8', @ischar);
 ip.addParameter('spknorm_datatype', 'single', @ischar);
 ip.addParameter('resid_datatype', 'single', @ischar);
 ip.addParameter('residnorm_datatype', 'single', @ischar);
+ip.addParameter('dataresid_datatype', 'single', @ischar);
 ip.addParameter('feature_scaling', 1, @isscalar);
 ip.addParameter('resid_scaling', 1, @isscalar);
+ip.addParameter('dataresid_scaling', 1, @isscalar);
 ip.addParameter('det_thresh', [], @(x) isempty(x) || isscalar(x));
 ip.addParameter('det_refrac', [], @(x) isempty(x) || isscalar(x));
 ip.addParameter('chunk_size', 4096, @isscalar);
@@ -114,6 +122,9 @@ L = basis.L;
 datasets = struct();
 dataset_names_and_shapes = {'feature',[D Inf]; 'index',Inf; 'subidx',Inf; ...
     'spknorm',Inf; 'resid',[L C Inf]; 'residnorm',Inf};
+if prm.dataresid
+    dataset_names_and_shapes(end+1,:) = {'dataresid',[Inf C]};
+end
 for name_dim = dataset_names_and_shapes'
     [name,shape] = deal(name_dim{:});
     datatype = datatype_prm.(name);
@@ -176,6 +187,10 @@ end
 % Special case for the residuals
 outputs.resid = spkdec.io.ResidSink( basis.toWhBasis(), ...
     'unwhitened',datasets.resid, 'norm',datasets.residnorm );
+% Add the data_resid if it exists
+if isfield(datasets,'dataresid')
+    outputs.data_resid = datasets.dataresid;
+end
 
 %% Add the other attributes
 
