@@ -124,6 +124,9 @@ dataset_names_and_shapes = {'feature',[D Inf]; 'index',Inf; 'subidx',Inf; ...
     'spknorm',Inf; 'resid',[L C Inf]; 'residnorm',Inf};
 if prm.dataresid
     dataset_names_and_shapes(end+1,:) = {'dataresid',[Inf C]};
+else
+    datatype_prm = rmfield(datatype_prm, 'dataresid');
+    scaling_prm = rmfield(scaling_prm, 'dataresid');
 end
 for name_dim = dataset_names_and_shapes'
     [name,shape] = deal(name_dim{:});
